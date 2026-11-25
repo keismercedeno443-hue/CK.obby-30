@@ -221,249 +221,70 @@
         function tryLockLandscape() {
             try {
                 if (screen.orientation && typeof screen.orientation.lock === 'function') {
-                    screen.orientation.lock('landscape').catch(() => {});
+                    const p = screen.orientation.lock('landscape');
+                    if (p && typeof p.catch === 'function') {
+                        p.catch(() => {});
+                    }
                 }
             } catch (e) {
                 // Ignorado en navegadores que no permiten bloqueo de orientación
             }
         }
+// ... existing code ... -->
+        function setMode(newMode) {
+            state.mode = newMode;
+            const lobby = document.getElementById('lobby-screen');
+            const hud = document.getElementById('game-hud');
+            const joy = document.getElementById('joystick-zone');
+            const jump = document.getElementById('jump-btn');
 
-        // =========================================================================
-        // ESTADO GLOBAL Y GUARDADO
-        // =========================================================================
-        const TOTAL_LEVELS = 30;
-        const STORAGE_KEY = 'obby3d_estado_v2';
-
-        const state = {
-            mode: 'lobby', // 'lobby' | 'playing'
-            currentLevel: 1,
-            unlockedLevel: 1,
-            coins: 0,
-            soundEnabled: true
-        };
-
-        function loadState() {
-            try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                if (!raw) return;
-                const parsed = JSON.parse(raw);
-                if (typeof parsed.currentLevel === 'number') {
-                    state.currentLevel = Math.min(TOTAL_LEVELS, Math.max(1, parsed.currentLevel));
+            if (newMode === 'playing') {
+                if (lobby) lobby.classList.add('hidden');
+                if (hud) hud.classList.remove('hidden');
+                if (joy) joy.classList.remove('hidden');
+                if (jump) jump.classList.remove('hidden');
+                try {
+                    if (!scene && typeof THREE !== 'undefined') {
+                        initThree();
+                    } else if (typeof buildLevel === 'function') {
+                        buildLevel(state.currentLevel);
+                    }
+                } catch (e) {
+                    console.warn('Error al construir el nivel:', e);
                 }
-                if (typeof parsed.unlockedLevel === 'number') {
-                    state.unlockedLevel = Math.min(TOTAL_LEVELS, Math.max(1, parsed.unlockedLevel));
+                if (state.soundEnabled) {
+                    try { startBgm(); } catch (e) {}
                 }
-                if (typeof parsed.coins === 'number') {
-                    state.coins = Math.max(0, Math.floor(parsed.coins));
-                }
-                if (typeof parsed.soundEnabled === 'boolean') {
-                    state.soundEnabled = parsed.soundEnabled;
-                }
-            } catch (e) {
-                console.warn('No se pudo cargar el progreso guardado:', e);
+            } else {
+                if (lobby) lobby.classList.remove('hidden');
+                if (hud) hud.classList.add('hidden');
+                if (joy) joy.classList.add('hidden');
+                if (jump) jump.classList.add('hidden');
             }
+            updateUi();
         }
-
-        function saveState() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    currentLevel: state.currentLevel,
-                    unlockedLevel: state.unlockedLevel,
-                    coins: state.coins,
-                    soundEnabled: state.soundEnabled
-                }));
-            } catch (e) {
-                console.warn('No se pudo guardar el progreso:', e);
+// ... existing code ... -->
+        function bindUiEvents() {
+            const playBtn = document.getElementById('btn-play');
+            if (playBtn) {
+                playBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMode('playing');
+                });
             }
-        }
 
-        let toastTimeout = null;
-        function showToast(msg, duration = 2200) {
-            const el = document.getElementById('toast-banner');
-            if (!el) return;
-            el.textContent = msg;
-            el.classList.remove('hidden');
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                el.classList.add('hidden');
-            }, duration);
-        }
-
-        // =========================================================================
-        // AUDIO Y MÚSICA DE FONDO (WEB AUDIO API)
-        // =========================================================================
-        let audioCtx = null;
-        let bgmTimer = null;
-        let bgmStep = 0;
-        const melodyNotes = [261.63, 329.63, 392.00, 523.25, 440.00, 392.00, 329.63, 349.23];
-        const bassNotes = [130.81, 130.81, 196.00, 196.00, 146.83, 146.83, 174.61, 196.00];
-
-        function getAudioCtx() {
-            if (!state.soundEnabled) return null;
-            try {
-                if (!audioCtx) {
-                    const Ctx = window.AudioContext || window.webkitAudioContext;
-                    if (Ctx) audioCtx = new Ctx();
-                }
-                if (audioCtx && audioCtx.state === 'suspended') {
-                    audioCtx.resume().catch(() => {});
-                }
-                return audioCtx;
-            } catch (e) {
-                return null;
+            const selectLvlBtn = document.getElementById('btn-select-level');
+            if (selectLvlBtn) {
+                selectLvlBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    renderLevelGrid();
+                    document.getElementById('level-modal').classList.remove('hidden');
+                });
             }
-        }
 
-        function playTone(freq, duration, type = 'sine', volume = 0.08, endFreq = null) {
-            const ctx = getAudioCtx();
-            if (!ctx) return;
-            try {
-                const now = ctx.currentTime;
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, now);
-                if (endFreq !== null) {
-                    osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
-                }
-                gain.gain.setValueAtTime(0.001, now);
-                gain.gain.linearRampToValueAtTime(volume, now + 0.015);
-                gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(now);
-                osc.stop(now + duration + 0.02);
-            } catch (e) {
-                // Ignorar errores de audio en navegadores restringidos
-            }
-        }
-
-        function sfxJump() {
-            playTone(230, 0.16, 'triangle', 0.11, 520);
-        }
-
-        function sfxCoin() {
-            playTone(784, 0.09, 'sine', 0.09, 1046.5);
-        }
-
-        function sfxCheckpoint() {
-            playTone(440, 0.11, 'sine', 0.09, 659.25);
-        }
-
-        function sfxPortal() {
-            playTone(523.25, 0.14, 'triangle', 0.11, 783.99);
-            setTimeout(() => playTone(783.99, 0.22, 'triangle', 0.11, 1046.5), 110);
-        }
-
-        function sfxLava() {
-            playTone(190, 0.24, 'sawtooth', 0.09, 75);
-        }
-
-        function startBgm() {
-            if (bgmTimer) return;
-            bgmTimer = setInterval(() => {
-                if (!state.soundEnabled || state.mode !== 'playing') return;
-                const idx = bgmStep % melodyNotes.length;
-                bgmStep += 1;
-                playTone(melodyNotes[idx], 0.22, 'triangle', 0.045);
-                if (idx % 2 === 0) {
-                    playTone(bassNotes[idx], 0.32, 'sine', 0.045);
-                }
-            }, 340);
-        }
-
-        ['pointerdown', 'touchstart', 'keydown'].forEach((evt) => {
-            window.addEventListener(evt, () => {
-                getAudioCtx();
-                if (state.soundEnabled) startBgm();
-                tryLockLandscape();
-            }, { passive: true });
-        });
-
-        // =========================================================================
-        // ESCENA THREE.JS, MUÑECO TIPO ROBLOX Y CIRCUITOS LARGOS (12-16 ETAPAS)
-        // =========================================================================
-        let scene, camera, renderer;
-        let cannonWorld = null;
-        let levelGroup, wallGroup;
-        let playerGroup, headMesh, torsoMesh, leftArmPivot, rightArmPivot, leftLegPivot, rightLegPivot;
-
-        const platforms = [];
-        const ladders = [];
-        const lavaZones = [];
-        const coins = [];
-        const spinners = [];
-        const lavaBalls = [];
-        const checkpoints = [];
-        const wallMeshes = [];
-        let lavaFloorMesh = null;
-        let portalMesh = null;
-        let portalPos = null;
-
-        const player = {
-            pos: new THREE.Vector3(0, 0.1, 0),
-            vel: new THREE.Vector3(0, 0, 0),
-            spawn: new THREE.Vector3(0, 0.1, 0),
-            radius: 0.42,
-            height: 1.85,
-            onGround: false,
-            yaw: 0,
-            walkCycle: 0
-        };
-
-        const camCtrl = {
-            yaw: 0,
-            pitch: 0.34,
-            distance: 9.5,
-            minDist: 4.5,
-            maxDist: 18.0
-        };
-
-        function createRobloxFaceTexture() {
-            const c = document.createElement('canvas');
-            c.width = 128;
-            c.height = 128;
-            const g = c.getContext('2d');
-            g.fillStyle = '#fde047';
-            g.fillRect(0, 0, 128, 128);
-            g.fillStyle = '#0f172a';
-            g.beginPath();
-            g.ellipse(42, 54, 8, 12, 0, 0, Math.PI * 2);
-            g.ellipse(86, 54, 8, 12, 0, 0, Math.PI * 2);
-            g.fill();
-            g.fillStyle = '#ffffff';
-            g.beginPath();
-            g.arc(44, 50, 3, 0, Math.PI * 2);
-            g.arc(88, 50, 3, 0, Math.PI * 2);
-            g.fill();
-            g.strokeStyle = '#0f172a';
-            g.lineWidth = 6;
-            g.lineCap = 'round';
-            g.beginPath();
-            g.arc(64, 72, 22, 0.15 * Math.PI, 0.85 * Math.PI);
-            g.stroke();
-            const tex = new THREE.CanvasTexture(c);
-            tex.needsUpdate = true;
-            return tex;
-        }
-
-        function createLavaTexture() {
-            const c = document.createElement('canvas');
-            c.width = 256;
-            c.height = 256;
-            const g = c.getContext('2d');
-            const grad = g.createLinearGradient(0, 0, 256, 256);
-            grad.addColorStop(0, '#dc2626');
-            grad.addColorStop(0.5, '#f97316');
-            grad.addColorStop(1, '#facc15');
-            g.fillStyle = grad;
-            g.fillRect(0, 0, 256, 256);
-
-            for (let row = 0; row < 4; row++) {
-                for (let col = 0; col < 4; col++) {
-                    const x = col * 64 + 4;
-                    const y = row * 64 + 4;
-                    g.fillStyle = (row + col) % 2 === 0 ? 'rgba(255, 237, 213, 0.22)' : 'rgba(127, 29, 29, 0.28)';
-                    g.beginPath();
-                    g.roundRect(x, y, 56, 56, 10);
-          
+            document.getElementById('btn-close-levels').addEventListener('click', () => {
+                document.getElementById('level-modal').classList.add('hidden');
+            });
+// ... existing code ... -->
