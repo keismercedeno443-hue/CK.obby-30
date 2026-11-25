@@ -20,7 +20,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #090d16;
+            background-color: #38bdf8;
             font-family: 'Inter', sans-serif;
             touch-action: none;
         }
@@ -328,7 +328,7 @@
         // MOTOR THREE.JS, PERSONAJE Y NIVELES DE 12 A 16 ETAPAS
         // =========================================================================
         let scene, camera, renderer;
-        let levelGroup, wallGroup;
+        let levelGroup, wallGroup, sceneryGroup;
         let playerGroup, headMesh, torsoMesh, leftArmPivot, rightArmPivot, leftLegPivot, rightLegPivot;
 
         const platforms = [];
@@ -338,11 +338,16 @@
         const spinners = [];
         const checkpoints = [];
         const wallMeshes = [];
+        const lavaSplashes = [];
         let lavaFloorMesh = null;
         let lavaCrustMesh = null;
+        let lavaSurfaceY = -8.5;
         let portalMesh = null;
         let portalPos = null;
-
+        const studTextureCache = new Map();
+        let lavaWaveGeo = null;
+        let lavaWaveBasePos = null;
+        let splashSpawnTimer = 0;
         const player = {
             pos: null,
             vel: null,
@@ -396,108 +401,212 @@
             c.height = 512;
             const g = c.getContext('2d');
 
-            const grad = g.createRadialGradient(256, 256, 30, 256, 256, 340);
-            grad.addColorStop(0, '#fef08a');
-            grad.addColorStop(0.28, '#f97316');
-            grad.addColorStop(0.68, '#dc2626');
-            grad.addColorStop(1, '#450a0a');
+            const grad = g.createLinearGradient(0, 0, 512, 512);
+            grad.addColorStop(0, '#fffbeb');
+            grad.addColorStop(0.24, '#facc15');
+            grad.addColorStop(0.55, '#f97316');
+            grad.addColorStop(0.85, '#dc2626');
+            grad.addColorStop(1, '#7f1d1d');
             g.fillStyle = grad;
             g.fillRect(0, 0, 512, 512);
 
-            for (let i = 0; i < 42; i++) {
-                const bx = ((i * 97) % 480) + 16;
-                const by = ((i * 151) % 480) + 16;
-                const br = 12 + (i % 5) * 8;
-                const bGrad = g.createRadialGradient(bx, by, 2, bx, by, br);
-                bGrad.addColorStop(0, 'rgba(254, 249, 195, 0.85)');
-                bGrad.addColorStop(0.55, 'rgba(251, 146, 60, 0.55)');
-                bGrad.addColorStop(1, 'rgba(153, 27, 27, 0)');
+            // Bandas fluidas y remolinos de lava líquida
+            for (let b = 0; b < 18; b++) {
+                const y0 = (b / 18) * 512;
+                const bGrad = g.createLinearGradient(0, y0 - 18, 0, y0 + 22);
+                bGrad.addColorStop(0, 'rgba(220, 38, 38, 0)');
+                bGrad.addColorStop(0.5, b % 2 === 0 ? 'rgba(254, 240, 138, 0.58)' : 'rgba(251, 146, 60, 0.62)');
+                bGrad.addColorStop(1, 'rgba(220, 38, 38, 0)');
+                g.fillStyle = bGrad;
+                g.beginPath();
+                g.moveTo(0, y0);
+                for (let x = 0; x <= 512; x += 32) {
+                    const waveY = y0 + Math.sin(x * 0.025 + b * 1.1) * 14;
+                    g.lineTo(x, waveY);
+                }
+                for (let x = 512; x >= 0; x -= 32) {
+                    const waveY = y0 + 18 + Math.cos(x * 0.02 + b * 0.9) * 14;
+                    g.lineTo(x, waveY);
+                }
+                g.closePath();
+                g.fill();
+            }
+
+            // Burbujas brillantes y núcleos calientes líquidos
+            for (let i = 0; i < 54; i++) {
+                const bx = ((i * 89) % 484) + 14;
+                const by = ((i * 137) % 484) + 14;
+                const br = 8 + (i % 6) * 6;
+                const bGrad = g.createRadialGradient(bx - br * 0.25, by - br * 0.25, 1.5, bx, by, br);
+                bGrad.addColorStop(0, 'rgba(255, 255, 240, 0.92)');
+                bGrad.addColorStop(0.45, 'rgba(250, 204, 21, 0.68)');
+                bGrad.addColorStop(0.8, 'rgba(249, 115, 22, 0.32)');
+                bGrad.addColorStop(1, 'rgba(185, 28, 28, 0)');
                 g.fillStyle = bGrad;
                 g.beginPath();
                 g.arc(bx, by, br, 0, Math.PI * 2);
                 g.fill();
             }
 
-            g.strokeStyle = 'rgba(255, 237, 213, 0.35)';
-            g.lineWidth = 4;
-            for (let k = 0; k < 14; k++) {
-                const sx = ((k * 73) % 460) + 20;
-                const sy = ((k * 113) % 460) + 20;
-                g.beginPath();
-                g.moveTo(sx, sy);
-                g.bezierCurveTo(sx + 28, sy - 18, sx + 45, sy + 24, sx + 76, sy + 6);
-                g.stroke();
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(22, 22);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        function createRobloxStudTexture(hexColor = 0x3b82f6) {
+            const key = Number(hexColor).toString(16).padStart(6, '0');
+            if (studTextureCache.has(key)) {
+                return studTextureCache.get(key);
+            }
+
+            const c = document.createElement('canvas');
+            c.width = 128;
+            c.height = 128;
+            const g = c.getContext('2d');
+
+            const baseCol = new THREE.Color(hexColor);
+            const r = Math.round(baseCol.r * 255);
+            const gr = Math.round(baseCol.g * 255);
+            const b = Math.round(baseCol.b * 255);
+
+            const lightR = Math.min(255, Math.round(r * 1.24 + 14));
+            const lightG = Math.min(255, Math.round(gr * 1.24 + 14));
+            const lightB = Math.min(255, Math.round(b * 1.24 + 14));
+
+            const darkR = Math.max(0, Math.round(r * 0.72));
+            const darkG = Math.max(0, Math.round(gr * 0.72));
+            const darkB = Math.max(0, Math.round(b * 0.72));
+
+            g.fillStyle = `rgb(${r}, ${gr}, ${b})`;
+            g.fillRect(0, 0, 128, 128);
+
+            // Sutil cuadricula tipo bloque clásico de Roblox
+            g.strokeStyle = `rgba(${darkR}, ${darkG}, ${darkB}, 0.28)`;
+            g.lineWidth = 2;
+            g.strokeRect(1, 1, 126, 126);
+
+            // Patrón 2x2 de studs elevados con highlight superior y sombra inferior
+            const gridCount = 2;
+            const cell = 128 / gridCount;
+            for (let gx = 0; gx < gridCount; gx++) {
+                for (let gy = 0; gy < gridCount; gy++) {
+                    const cx = gx * cell + cell * 0.5;
+                    const cy = gy * cell + cell * 0.5;
+                    const radius = cell * 0.25;
+
+                    g.fillStyle = `rgba(${darkR}, ${darkG}, ${darkB}, 0.45)`;
+                    g.beginPath();
+                    g.arc(cx + 2, cy + 3, radius, 0, Math.PI * 2);
+                    g.fill();
+
+                    const studGrad = g.createRadialGradient(
+                        cx - radius * 0.3,
+                        cy - radius * 0.3,
+                        radius * 0.12,
+                        cx,
+                        cy,
+                        radius
+                    );
+                    studGrad.addColorStop(0, `rgb(${lightR}, ${lightG}, ${lightB})`);
+                    studGrad.addColorStop(0.75, `rgb(${r}, ${gr}, ${b})`);
+                    studGrad.addColorStop(1, `rgb(${darkR}, ${darkG}, ${darkB})`);
+
+                    g.fillStyle = studGrad;
+                    g.beginPath();
+                    g.arc(cx, cy, radius, 0, Math.PI * 2);
+                    g.fill();
+
+                    g.strokeStyle = `rgba(255, 255, 255, 0.24)`;
+                    g.lineWidth = 1.5;
+                    g.beginPath();
+                    g.arc(cx, cy, radius * 0.86, Math.PI * 1.15, Math.PI * 1.85);
+                    g.stroke();
+                }
             }
 
             const tex = new THREE.CanvasTexture(c);
             tex.wrapS = THREE.RepeatWrapping;
             tex.wrapT = THREE.RepeatWrapping;
-            tex.repeat.set(18, 18);
             tex.needsUpdate = true;
+            studTextureCache.set(key, tex);
             return tex;
         }
 
-        function buildRobloxPlayer() {
-            playerGroup = new THREE.Group();
-
-            const torsoMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.45 });
-            torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.05, 0.52), torsoMat);
-            torsoMesh.position.y = 1.25;
-            torsoMesh.castShadow = true;
-            playerGroup.add(torsoMesh);
-
-            const faceTex = createRobloxFaceTexture();
-            const headMats = [
-                new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4 }),
-                new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4 }),
-                new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4 }),
-                new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4 }),
-                new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.35 }),
-                new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4 })
-            ];
-            headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.68, 0.68), headMats);
-            headMesh.position.y = 2.13;
-            headMesh.castShadow = true;
-            playerGroup.add(headMesh);
-
-            const limbMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.45 });
-            const legMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.5 });
-
-            leftArmPivot = new THREE.Group();
-            leftArmPivot.position.set(-0.68, 1.72, 0);
-            const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.98, 0.36), limbMat);
-            lArm.position.y = -0.42;
-            lArm.castShadow = true;
-            leftArmPivot.add(lArm);
-            playerGroup.add(leftArmPivot);
-
-            rightArmPivot = new THREE.Group();
-            rightArmPivot.position.set(0.68, 1.72, 0);
-            const rArm = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.98, 0.36), limbMat);
-            rArm.position.y = -0.42;
-            rArm.castShadow = true;
-            rightArmPivot.add(rArm);
-            playerGroup.add(rightArmPivot);
-
-            leftLegPivot = new THREE.Group();
-            leftLegPivot.position.set(-0.24, 0.72, 0);
-            const lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.72, 0.42), legMat);
-            lLeg.position.y = -0.36;
-            lLeg.castShadow = true;
-            leftLegPivot.add(lLeg);
-            playerGroup.add(leftLegPivot);
-
-            rightLegPivot = new THREE.Group();
-            rightLegPivot.position.set(0.24, 0.72, 0);
-            const rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.72, 0.42), legMat);
-            rLeg.position.y = -0.36;
-            rLeg.castShadow = true;
-            rightLegPivot.add(rLeg);
-            playerGroup.add(rightLegPivot);
-
-            scene.add(playerGroup);
+        function createStuddedBlockMaterial(hexColor, roughness = 0.42, metalness = 0.06, repeatX = 1, repeatY = 1) {
+            const baseTex = createRobloxStudTexture(hexColor).clone();
+            baseTex.repeat.set(Math.max(1, repeatX), Math.max(1, repeatY));
+            baseTex.needsUpdate = true;
+            return new THREE.MeshStandardMaterial({
+                map: baseTex,
+                roughness,
+                metalness
+            });
         }
 
+        function buildOpenWorldScenery(minX, maxX, minZ, maxZ, lavaFloorY) {
+            if (!sceneryGroup) return;
+
+            const centerX = (minX + maxX) * 0.5;
+            const centerZ = (minZ + maxZ) * 0.5;
+            const spanX = Math.max(40, maxX - minX);
+            const spanZ = Math.max(40, maxZ - minZ);
+            const outerRadius = Math.max(spanX, spanZ) * 0.68 + 38;
+
+            const grassMat = createStuddedBlockMaterial(0x22c55e, 0.68, 0.03, 4, 4);
+            const dirtMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
+            const stoneMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.75 });
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.8 });
+            const leafMatA = createStuddedBlockMaterial(0x16a34a, 0.65, 0.02, 2, 2);
+            const leafMatB = createStuddedBlockMaterial(0x15803d, 0.68, 0.02, 2, 2);
+
+            const islandCount = 14;
+            for (let i = 0; i < islandCount; i++) {
+                const angle = (i / islandCount) * Math.PI * 2 + 0.22;
+                const dist = outerRadius + ((i * 19) % 28);
+                const ix = centerX + Math.cos(angle) * dist;
+                const iz = centerZ + Math.sin(angle) * dist;
+
+                const iw = 18 + ((i * 7) % 16);
+                const id = 18 + ((i * 11) % 16);
+                const ih = 14 + ((i * 5) % 18);
+                const topY = lavaFloorY + ih;
+
+                const cliff = new THREE.Mesh(new THREE.BoxGeometry(iw, ih + 8, id), i % 2 === 0 ? dirtMat : stoneMat);
+                cliff.position.set(ix, lavaFloorY + (ih - 8) * 0.5, iz);
+                cliff.receiveShadow = true;
+                sceneryGroup.add(cliff);
+
+                const grassCap = new THREE.Mesh(new THREE.BoxGeometry(iw + 0.6, 1.4, id + 0.6), grassMat);
+                grassCap.position.set(ix, topY + 0.4, iz);
+                grassCap.receiveShadow = true;
+                sceneryGroup.add(grassCap);
+
+                // Árboles estilizados en bloques tipo Roblox
+                const treeCount = 3 + (i % 3);
+                for (let t = 0; t < treeCount; t++) {
+                    const tx = ix + Math.sin(i * 5 + t * 2.1) * (iw * 0.28);
+                    const tz = iz + Math.cos(i * 3 + t * 2.4) * (id * 0.28);
+                    const trunkH = 3.2 + ((t + i) % 3) * 0.9;
+
+                    const trunk = new THREE.Mesh(new THREE.BoxGeometry(1.1, trunkH, 1.1), trunkMat);
+                    trunk.position.set(tx, topY + 1.1 + trunkH * 0.5, tz);
+                    trunk.castShadow = true;
+                    sceneryGroup.add(trunk);
+
+                    const crownSize = 3.6 + ((t * 7 + i) % 3) * 0.7;
+                    const crown = new THREE.Mesh(
+                        new THREE.BoxGeometry(crownSize, crownSize * 0.85, crownSize),
+                        (i + t) % 2 === 0 ? leafMatA : leafMatB
+                    );
+                    crown.position.set(tx, topY + 1.1 + trunkH + crownSize * 0.35, tz);
+                    crown.castShadow = true;
+                    sceneryGroup.add(crown);
+                }
+            }
+        }
         function initThree() {
             const canvas = document.getElementById('game-canvas');
             if (!canvas || typeof THREE === 'undefined') return false;
@@ -507,10 +616,10 @@
             player.spawn = new THREE.Vector3(0, 0.1, 0);
 
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0b1224);
-            scene.fog = new THREE.FogExp2(0x0b1224, 0.0085);
+            scene.background = new THREE.Color(0x60a5fa);
+            scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0042);
 
-            camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 320);
+            camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 380);
 
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -518,18 +627,18 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-            const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 0.95);
-            hemiLight.position.set(0, 60, 0);
+            const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.05);
+            hemiLight.position.set(0, 70, 0);
             scene.add(hemiLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.05);
-            dirLight.position.set(28, 48, 22);
+            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.15);
+            dirLight.position.set(32, 54, 26);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024;
             dirLight.shadow.mapSize.height = 1024;
             dirLight.shadow.camera.near = 5;
-            dirLight.shadow.camera.far = 160;
-            const d = 45;
+            dirLight.shadow.camera.far = 175;
+            const d = 48;
             dirLight.shadow.camera.left = -d;
             dirLight.shadow.camera.right = d;
             dirLight.shadow.camera.top = d;
@@ -538,8 +647,8 @@
 
             levelGroup = new THREE.Group();
             wallGroup = new THREE.Group();
-            scene.add(levelGroup);
-            scene.add(wallGroup);
+            sceneryGroup = new THREE.Group();
+            scene.add(sceneryGroup, levelGroup, wallGroup);
 
             buildRobloxPlayer();
 
@@ -557,11 +666,12 @@
             if (!scene) return;
             if (levelGroup) scene.remove(levelGroup);
             if (wallGroup) scene.remove(wallGroup);
+            if (sceneryGroup) scene.remove(sceneryGroup);
 
             levelGroup = new THREE.Group();
             wallGroup = new THREE.Group();
-            scene.add(levelGroup);
-            scene.add(wallGroup);
+            sceneryGroup = new THREE.Group();
+            scene.add(sceneryGroup, levelGroup, wallGroup);
 
             platforms.length = 0;
             ladders.length = 0;
@@ -570,18 +680,144 @@
             spinners.length = 0;
             checkpoints.length = 0;
             wallMeshes.length = 0;
+            lavaSplashes.length = 0;
             lavaFloorMesh = null;
             lavaCrustMesh = null;
             portalMesh = null;
             portalPos = null;
+            splashSpawnTimer = 0;
+        }
+
+        function addSafeRestPlatform(x, y, z, w = 11.5, d = 9.5, color = 0x1e293b) {
+            // Plataforma bien ancha y estable sin movimiento para descansar, orientar la cámara y preparar saltos
+            return addPlatform(x, y, z, w, 1.0, d, color, {
+                roughness: 0.48,
+                metalness: 0.05
+            });
+        }
+
+        function initLavaSplashPool(minX, maxX, minZ, maxZ, surfaceY) {
+            lavaSurfaceY = surfaceY;
+            if (!levelGroup) return;
+
+            const dropletGeo = new THREE.OctahedronGeometry(0.2, 0);
+            const brightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+            const orangeMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+
+            const poolCount = 42;
+            const spanX = Math.max(24, maxX - minX);
+            const spanZ = Math.max(24, maxZ - minZ);
+            const cx = (minX + maxX) * 0.5;
+            const cz = (minZ + maxZ) * 0.5;
+
+            for (let i = 0; i < poolCount; i++) {
+                const mesh = new THREE.Mesh(dropletGeo, i % 3 === 0 ? brightMat : orangeMat);
+                mesh.visible = false;
+                levelGroup.add(mesh);
+
+                lavaSplashes.push({
+                    mesh,
+                    active: false,
+                    x: cx,
+                    y: surfaceY,
+                    z: cz,
+                    vx: 0,
+                    vy: 0,
+                    vz: 0,
+                    age: 0,
+                    maxAge: 1.0,
+                    baseScale: 0.75 + (i % 4) * 0.25,
+                    spanX,
+                    spanZ,
+                    cx,
+                    cz
+                });
+            }
+        }
+
+        function spawnLavaSplashDroplet(fromHazard = false) {
+            if (!lavaSplashes.length) return;
+            const slot = lavaSplashes.find((s) => !s.active);
+            if (!slot) return;
+
+            let originX = slot.cx + (Math.random() - 0.5) * slot.spanX * 0.72;
+            let originZ = slot.cz + (Math.random() - 0.5) * slot.spanZ * 0.72;
+            let originY = lavaSurfaceY + 0.08;
+
+            if (fromHazard && lavaZones.length > 0) {
+                const hz = lavaZones[Math.floor(Math.random() * lavaZones.length)];
+                originX = hz.x + (Math.random() - 0.5) * Math.max(0.5, hz.w * 0.8);
+                originZ = hz.z + (Math.random() - 0.5) * Math.max(0.5, hz.d * 0.8);
+                originY = hz.y + hz.h * 0.5 + 0.06;
+            } else if (player && player.pos && Math.random() < 0.45) {
+                // Concentrar parte de las salpicaduras cerca del jugador para dar vida visible
+                originX = player.pos.x + (Math.random() - 0.5) * 26;
+                originZ = player.pos.z + (Math.random() - 0.5) * 26;
+            }
+
+            slot.active = true;
+            slot.x = originX;
+            slot.y = originY;
+            slot.z = originZ;
+            slot.vx = (Math.random() - 0.5) * 2.8;
+            slot.vy = fromHazard ? (5.2 + Math.random() * 3.4) : (6.4 + Math.random() * 4.6);
+            slot.vz = (Math.random() - 0.5) * 2.8;
+            slot.age = 0;
+            slot.maxAge = 0.75 + Math.random() * 0.65;
+            slot.mesh.position.set(slot.x, slot.y, slot.z);
+            slot.mesh.scale.setScalar(slot.baseScale);
+            slot.mesh.visible = true;
+        }
+
+        function updateLavaSplashes(dt) {
+            if (!lavaSplashes.length) return;
+
+            splashSpawnTimer += dt;
+            const spawnInterval = state.mode === 'playing' ? 0.055 : 0.09;
+            while (splashSpawnTimer >= spawnInterval) {
+                splashSpawnTimer -= spawnInterval;
+                spawnLavaSplashDroplet(lavaZones.length > 0 && Math.random() < 0.35);
+            }
+
+            const gravity = 16.5;
+            for (const s of lavaSplashes) {
+                if (!s.active) continue;
+                s.age += dt;
+                if (s.age >= s.maxAge) {
+                    s.active = false;
+                    s.mesh.visible = false;
+                    continue;
+                }
+
+                s.vy -= gravity * dt;
+                s.x += s.vx * dt;
+                s.y += s.vy * dt;
+                s.z += s.vz * dt;
+
+                const lifeRatio = 1 - (s.age / s.maxAge);
+                const scale = Math.max(0.12, s.baseScale * lifeRatio);
+                s.mesh.position.set(s.x, s.y, s.z);
+                s.mesh.scale.setScalar(scale);
+                s.mesh.rotation.x += 6 * dt;
+                s.mesh.rotation.y += 5 * dt;
+
+                if (s.y < lavaSurfaceY - 0.35 && s.vy < 0) {
+                    s.active = false;
+                    s.mesh.visible = false;
+                }
+            }
         }
 
         function addPlatform(x, y, z, w, h, d, color = 0x3b82f6, options = {}) {
-            const mat = new THREE.MeshStandardMaterial({
+            const repX = Math.max(1, Math.round(w / 2.6));
+            const repZ = Math.max(1, Math.round(d / 2.6));
+            const mat = createStuddedBlockMaterial(
                 color,
-                roughness: options.roughness ?? 0.45,
-                metalness: options.metalness ?? 0.08
-            });
+                options.roughness ?? 0.42,
+                options.metalness ?? 0.06,
+                repX,
+                repZ
+            );
             const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
             mesh.position.set(x, y, z);
             mesh.castShadow = true;
@@ -601,115 +837,40 @@
             platforms.push(plat);
             return plat;
         }
-
-        function addLadder(x, bottomY, z, height, width = 2.2) {
-            const group = new THREE.Group();
-            group.position.set(x, bottomY, z);
-
-            const railMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 });
-            const rungMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.35 });
-
-            const leftRail = new THREE.Mesh(new THREE.BoxGeometry(0.16, height, 0.16), railMat);
-            leftRail.position.set(-width * 0.45, height * 0.5, 0);
-            const rightRail = new THREE.Mesh(new THREE.BoxGeometry(0.16, height, 0.16), railMat);
-            rightRail.position.set(width * 0.45, height * 0.5, 0);
-            group.add(leftRail, rightRail);
-
-            const rungCount = Math.max(3, Math.floor(height / 0.65));
-            for (let i = 1; i < rungCount; i++) {
-                const ry = (i / rungCount) * height;
-                const rung = new THREE.Mesh(new THREE.BoxGeometry(width * 0.9, 0.12, 0.14), rungMat);
-                rung.position.set(0, ry, 0);
-                group.add(rung);
-            }
-
-            levelGroup.add(group);
-            ladders.push({
-                x,
-                minY: bottomY,
-                maxY: bottomY + height,
-                z,
-                halfW: width * 0.55 + 0.45,
-                halfD: 0.75
-            });
-        }
-
-        function addLavaBlock(x, y, z, w, h, d) {
-            const mat = new THREE.MeshStandardMaterial({
-                color: 0xff4500,
-                emissive: 0xdc2626,
-                emissiveIntensity: 0.65,
-                roughness: 0.3
-            });
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-            mesh.position.set(x, y, z);
-            levelGroup.add(mesh);
-            lavaZones.push({ x, y, z, w, h, d });
-        }
-
-        function addCoin(x, y, z, id) {
-            const mat = new THREE.MeshStandardMaterial({
-                color: 0xfacc15,
-                emissive: 0xeab308,
-                emissiveIntensity: 0.35,
-                metalness: 0.6,
-                roughness: 0.25
-            });
-            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.14, 18), mat);
-            mesh.rotation.x = Math.PI / 2;
-            mesh.position.set(x, y, z);
-            levelGroup.add(mesh);
-            coins.push({ id, mesh, x, y, z, collected: false });
-        }
-
-        function addSpinner(x, y, z, armLength, speed, thickness = 0.45) {
-            const pivot = new THREE.Group();
-            pivot.position.set(x, y, z);
-
-            const hub = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.65, 0.65, 1.1, 14),
-                new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 })
-            );
-            pivot.add(hub);
-
-            const barMat = new THREE.MeshStandardMaterial({
-                color: 0xef4444,
-                emissive: 0x991b1b,
-                emissiveIntensity: 0.45,
-                roughness: 0.35
-            });
-            const bar = new THREE.Mesh(new THREE.BoxGeometry(armLength * 2, thickness, thickness), barMat);
-            pivot.add(bar);
-
-            levelGroup.add(pivot);
-            spinners.push({ pivot, x, y, z, armLength, speed, thickness });
-        }
-
         function addCheckpoint(x, y, z, index) {
             const group = new THREE.Group();
             group.position.set(x, y, z);
 
-            const pad = new THREE.Mesh(
-                new THREE.BoxGeometry(3.2, 0.22, 3.2),
-                new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 })
-            );
-            pad.position.y = 0.11;
-            group.add(pad);
+            const frameMat = createStuddedBlockMaterial(0x1e293b, 0.5, 0.1, 2, 2);
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.18, 3.6), frameMat);
+            frame.position.y = 0.09;
+            frame.receiveShadow = true;
+            group.add(frame);
+
+            const padMat = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                emissive: 0x0284c7,
+                emissiveIntensity: 0.65,
+                roughness: 0.25
+            });
+            const glowPad = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.22, 2.9), padMat);
+            glowPad.position.y = 0.12;
+            group.add(glowPad);
 
             const flagPole = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.08, 0.08, 2.6, 10),
-                new THREE.MeshStandardMaterial({ color: 0xe2e8f0 })
+                new THREE.MeshStandardMaterial({ color: 0xf8fafc })
             );
-            flagPole.position.set(1.2, 1.3, -1.2);
+            flagPole.position.set(1.35, 1.3, -1.35);
             group.add(flagPole);
 
             const flagMat = new THREE.MeshStandardMaterial({
                 color: 0xf43f5e,
                 emissive: 0x881337,
-                emissiveIntensity: 0.3
+                emissiveIntensity: 0.35
             });
-            const flag = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.08), flagMat);
-            flag.position.set(1.65, 2.25, -1.2);
+            const flag = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.56, 0.08), flagMat);
+            flag.position.set(1.82, 2.25, -1.35);
             group.add(flag);
 
             levelGroup.add(group);
@@ -719,407 +880,617 @@
                 y: y + 0.25,
                 z,
                 reached: false,
-                flagMat
+                flagMat,
+                padMat
+            });
+        }
+
+        function addLavaZone(x, y, z, w, h, d) {
+            const lavaTex = createLavaTexture();
+            lavaTex.repeat.set(Math.max(1.5, w / 2.2), Math.max(1.5, d / 2.2));
+            const mat = new THREE.MeshStandardMaterial({
+                map: lavaTex,
+                color: 0xff7043,
+                emissive: 0xff5722,
+                emissiveMap: lavaTex,
+                emissiveIntensity: 1.25,
+                roughness: 0.14,
+                metalness: 0.12
+            });
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            mesh.position.set(x, y, z);
+            levelGroup.add(mesh);
+            lavaZones.push({
+                mesh,
+                tex: lavaTex,
+                baseY: y,
+                x, y, z, w, h, d
+            });
+        }
+
+        function addLadder(x, y, z, w, h, d, color = 0xf59e0b) {
+            const mat = createStuddedBlockMaterial(color, 0.45, 0.08, 1, Math.max(1, Math.round(h / 2)));
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            levelGroup.add(mesh);
+            ladders.push({ x, y, z, w, h, d });
+        }
+
+        function addSpinner(x, y, z, length = 7.5, speed = 1.6) {
+            const pivot = new THREE.Group();
+            pivot.position.set(x, y, z);
+
+            const hub = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.45, 0.45, 1.1, 14),
+                new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 })
+            );
+            pivot.add(hub);
+
+            const barMat = new THREE.MeshStandardMaterial({
+                color: 0xef4444,
+                emissive: 0x991b1b,
+                emissiveIntensity: 0.45,
+                roughness: 0.3
+            });
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(length, 0.42, 0.42), barMat);
+            pivot.add(bar);
+
+            levelGroup.add(pivot);
+            spinners.push({
+                pivot,
+                x, y, z,
+                length,
+                thickness: 0.55,
+                speed,
+                angle: 0
+            });
+        }
+
+        function addCoin(x, y, z) {
+            const mesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.42, 0.42, 0.14, 16),
+                new THREE.MeshStandardMaterial({
+                    color: 0xfacc15,
+                    emissive: 0xca8a04,
+                    emissiveIntensity: 0.4,
+                    metalness: 0.35,
+                    roughness: 0.25
+                })
+            );
+            mesh.rotation.z = Math.PI * 0.5;
+            mesh.position.set(x, y, z);
+            levelGroup.add(mesh);
+            coins.push({
+                mesh,
+                x, y, z,
+                baseY: y,
+                collected: false,
+                phase: Math.random() * Math.PI * 2
             });
         }
 
         function addPortal(x, y, z) {
+            portalPos = new THREE.Vector3(x, y + 1.4, z);
             const group = new THREE.Group();
             group.position.set(x, y, z);
 
-            const outerRing = new THREE.Mesh(
-                new THREE.TorusGeometry(1.65, 0.22, 16, 36),
+            const base = new THREE.Mesh(
+                new THREE.CylinderGeometry(2.1, 2.3, 0.35, 24),
+                createStuddedBlockMaterial(0x1e293b, 0.4, 0.2, 2, 2)
+            );
+            base.position.y = 0.17;
+            base.receiveShadow = true;
+            group.add(base);
+
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(1.55, 0.16, 14, 32),
                 new THREE.MeshStandardMaterial({
                     color: 0x38bdf8,
                     emissive: 0x0284c7,
-                    emissiveIntensity: 0.75,
+                    emissiveIntensity: 0.8,
                     roughness: 0.2
                 })
             );
-            outerRing.position.y = 2.0;
-            group.add(outerRing);
+            ring.position.y = 1.85;
+            group.add(ring);
 
-            const innerCore = new THREE.Mesh(
-                new THREE.CircleGeometry(1.42, 32),
+            const core = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.38, 1.38, 2.8, 24, 1, true),
                 new THREE.MeshBasicMaterial({
                     color: 0x22d3ee,
                     transparent: true,
-                    opacity: 0.45,
+                    opacity: 0.32,
                     side: THREE.DoubleSide
                 })
             );
-            innerCore.position.y = 2.0;
-            group.add(innerCore);
+            core.position.y = 1.85;
+            group.add(core);
 
             levelGroup.add(group);
-            portalMesh = group;
-            portalPos = new THREE.Vector3(x, y + 1.5, z);
+            portalMesh = { group, ring, core };
         }
 
-        function buildCircuitWall(minX, maxX, minZ, maxZ, floorY) {
+        function buildRobloxPlayer() {
+            playerGroup = new THREE.Group();
+
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.5 });
+            const faceMat = new THREE.MeshStandardMaterial({ map: createRobloxFaceTexture(), roughness: 0.45 });
+            const shirtMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
+            const pantsMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.55 });
+
+            headMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.66, 0.66, 0.66),
+                [skinMat, skinMat, skinMat, skinMat, faceMat, skinMat]
+            );
+            headMesh.position.y = 1.56;
+            headMesh.castShadow = true;
+            playerGroup.add(headMesh);
+
+            torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.86, 0.44), shirtMat);
+            torsoMesh.position.y = 0.82;
+            torsoMesh.castShadow = true;
+            playerGroup.add(torsoMesh);
+
+            leftArmPivot = new THREE.Group();
+            leftArmPivot.position.set(-0.56, 1.18, 0);
+            const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.82, 0.32), skinMat);
+            lArm.position.y = -0.34;
+            lArm.castShadow = true;
+            leftArmPivot.add(lArm);
+            playerGroup.add(leftArmPivot);
+
+            rightArmPivot = new THREE.Group();
+            rightArmPivot.position.set(0.56, 1.18, 0);
+            const rArm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.82, 0.32), skinMat);
+            rArm.position.y = -0.34;
+            rArm.castShadow = true;
+            rightArmPivot.add(rArm);
+            playerGroup.add(rightArmPivot);
+
+            leftLegPivot = new THREE.Group();
+            leftLegPivot.position.set(-0.21, 0.39, 0);
+            const lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.78, 0.38), pantsMat);
+            lLeg.position.y = -0.39;
+            lLeg.castShadow = true;
+            leftLegPivot.add(lLeg);
+            playerGroup.add(leftLegPivot);
+
+            rightLegPivot = new THREE.Group();
+            rightLegPivot.position.set(0.21, 0.39, 0);
+            const rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.78, 0.38), pantsMat);
+            rLeg.position.y = -0.39;
+            rLeg.castShadow = true;
+            rightLegPivot.add(rLeg);
+            playerGroup.add(rightLegPivot);
+
+            scene.add(playerGroup);
+        }
+
+        function buildCircuitWall(minX, maxX, minZ, maxZ, lavaFloorY) {
+            const margin = 10;
+            const x0 = minX - margin;
+            const x1 = maxX + margin;
+            const z0 = minZ - margin;
+            const z1 = maxZ + margin;
+
+            const spanX = x1 - x0;
+            const spanZ = z1 - z0;
+            const cx = (x0 + x1) * 0.5;
+            const cz = (z0 + z1) * 0.5;
+
+            const lavaTex = createLavaTexture();
+            const lavaMat = new THREE.MeshStandardMaterial({
+                map: lavaTex,
+                color: 0xff6d3b,
+                emissive: 0xff4500,
+                emissiveMap: lavaTex,
+                emissiveIntensity: 1.15,
+                roughness: 0.15,
+                metalness: 0.1
+            });
+            lavaWaveGeo = new THREE.PlaneGeometry(spanX + 160, spanZ + 160, 56, 56);
+            lavaWaveGeo.rotateX(-Math.PI * 0.5);
+            lavaWaveBasePos = new Float32Array(lavaWaveGeo.attributes.position.array);
+
+            lavaFloorMesh = new THREE.Mesh(lavaWaveGeo, lavaMat);
+            lavaFloorMesh.position.set(cx, lavaFloorY, cz);
+            sceneryGroup.add(lavaFloorMesh);
+
+            const crustMat = new THREE.MeshStandardMaterial({
+                color: 0x451a03,
+                roughness: 0.85
+            });
+            lavaCrustMesh = new THREE.Mesh(new THREE.PlaneGeometry(spanX + 160, spanZ + 160), crustMat);
+            lavaCrustMesh.rotation.x = -Math.PI * 0.5;
+            lavaCrustMesh.position.set(cx, lavaFloorY - 0.55, cz);
+            sceneryGroup.add(lavaCrustMesh);
+
             const wallMat = new THREE.MeshStandardMaterial({
-                color: 0x1e293b,
+                color: 0x334155,
                 transparent: true,
-                opacity: 0.22,
+                opacity: 0.14,
                 roughness: 0.6
             });
-            const wallHeight = 24;
-            const thickness = 1.2;
-            const centerY = floorY + wallHeight * 0.5 - 2;
-            const spanX = maxX - minX;
-            const spanZ = maxZ - minZ;
+            const wallH = 16;
+            const wallThick = 1.2;
 
-            const north = new THREE.Mesh(new THREE.BoxGeometry(spanX + thickness * 2, wallHeight, thickness), wallMat);
-            north.position.set((minX + maxX) * 0.5, centerY, minZ - thickness * 0.5);
+            const northWall = new THREE.Mesh(new THREE.BoxGeometry(spanX, wallH, wallThick), wallMat);
+            northWall.position.set(cx, lavaFloorY + wallH * 0.5, z0);
 
-            const south = new THREE.Mesh(new THREE.BoxGeometry(spanX + thickness * 2, wallHeight, thickness), wallMat);
-            south.position.set((minX + maxX) * 0.5, centerY, maxZ + thickness * 0.5);
+            const southWall = new THREE.Mesh(new THREE.BoxGeometry(spanX, wallH, wallThick), wallMat);
+            southWall.position.set(cx, lavaFloorY + wallH * 0.5, z1);
 
-            const west = new THREE.Mesh(new THREE.BoxGeometry(thickness, wallHeight, spanZ + thickness * 2), wallMat);
-            west.position.set(minX - thickness * 0.5, centerY, (minZ + maxZ) * 0.5);
+            const westWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, spanZ), wallMat);
+            westWall.position.set(x0, lavaFloorY + wallH * 0.5, cz);
 
-            const east = new THREE.Mesh(new THREE.BoxGeometry(thickness, wallHeight, spanZ + thickness * 2), wallMat);
-            east.position.set(maxX + thickness * 0.5, centerY, (minZ + maxZ) * 0.5);
+            const eastWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, spanZ), wallMat);
+            eastWall.position.set(x1, lavaFloorY + wallH * 0.5, cz);
 
-            wallGroup.add(north, south, west, east);
-            wallMeshes.push(north, south, west, east);
-        }
-
-        function seededRandom(seed) {
-            let s = seed % 2147483647;
-            if (s <= 0) s += 2147483646;
-            return () => {
-                s = (s * 16807) % 2147483647;
-                return (s - 1) / 2147483646;
-            };
+            wallGroup.add(northWall, southWall, westWall, eastWall);
+            wallMeshes.push(
+                { minX: x0 - wallThick, maxX: x0 + wallThick, minZ: z0, maxZ: z1 },
+                { minX: x1 - wallThick, maxX: x1 + wallThick, minZ: z0, maxZ: z1 },
+                { minX: x0, maxX: x1, minZ: z0 - wallThick, maxZ: z0 + wallThick },
+                { minX: x0, maxX: x1, minZ: z1 - wallThick, maxZ: z1 + wallThick }
+            );
         }
 
         function buildLevel(levelNum) {
             clearLevel();
-
             const clamped = Math.min(TOTAL_LEVELS, Math.max(1, levelNum));
             state.currentLevel = clamped;
-            saveState();
 
-            const rng = seededRandom(clamped * 7919 + 104729);
-            const stageCount = 12 + ((clamped - 1) % 5);
             const diff = (clamped - 1) / (TOTAL_LEVELS - 1);
-
-            const palette = [
-                0x3b82f6, 0x10b981, 0x8b5cf6, 0xf59e0b, 0x06b6d4, 0xec4899
-            ];
-            const themeColor = palette[(clamped - 1) % palette.length];
+            const stageCount = 12 + (clamped % 5);
+            const palette = [0x3b82f6, 0x8b5cf6, 0x06b6d4, 0xec4899, 0x10b981, 0xf97316];
+            const baseColor = palette[clamped % palette.length];
+            const accentColor = palette[(clamped + 2) % palette.length];
 
             let cx = 0;
             let cy = 0;
             let cz = 0;
-            let coinCounter = 0;
-            let checkpointCounter = 0;
+            let minX = -6, maxX = 6, minZ = -6, maxZ = 6;
+            const lavaFloorY = -8.5;
 
-            let minX = -10, maxX = 10, minZ = -10, maxZ = 10;
-
-            const trackBounds = (px, pz, pw, pd) => {
-                minX = Math.min(minX, px - pw * 0.5 - 6);
-                maxX = Math.max(maxX, px + pw * 0.5 + 6);
-                minZ = Math.min(minZ, pz - pd * 0.5 - 6);
-                maxZ = Math.max(maxZ, pz + pd * 0.5 + 6);
-            };
-
-            addPlatform(cx, cy - 0.5, cz, 8, 1, 8, 0x2563eb);
-            trackBounds(cx, cz, 8, 8);
+            addPlatform(cx, cy - 0.5, cz, 11.5, 1.0, 10.5, 0x475569);
             player.spawn.set(cx, cy + 0.1, cz);
             player.pos.copy(player.spawn);
-            player.vel.set(0, 0, 0);
+            if (player.vel) player.vel.set(0, 0, 0);
             player.yaw = 0;
             camCtrl.yaw = 0;
             camCtrl.pitch = 0.34;
 
-            for (let step = 1; step <= stageCount; step++) {
-                const patternIndex = (clamped + step) % 5;
-                const stepLen = 10.6 + diff * 3.2;
-                const turnOffset = (rng() - 0.5) * 6.8;
+            for (let s = 1; s <= stageCount; s++) {
+                const gap = 3.2 + diff * 1.45 + ((s % 3) * 0.32);
+                const lateralShift = Math.sin(s * 1.35 + clamped * 0.7) * (1.8 + diff * 2.1);
+                const stepUp = (s % 4 === 0) ? (1.05 + diff * 0.35) : ((s % 5 === 0) ? -0.45 : 0);
 
-                if (patternIndex === 0) {
-                    // Puente móvil lateral o angosto con mayor separación
-                    const bridgeLen = stepLen + 4.2;
-                    const bridgeW = Math.max(1.75, 2.55 - diff * 0.8);
-                    const midZ = cz - bridgeLen * 0.5 - 3.3;
-                    const midX = cx + turnOffset * 0.6;
-                    const isMovingBridge = (step + clamped) % 2 === 0;
-                    addPlatform(midX, cy - 0.35, midZ, bridgeW, 0.7, bridgeLen, themeColor, {
-                        moveAxis: isMovingBridge ? 'x' : null,
-                        moveAmp: isMovingBridge ? 2.1 + diff * 1.1 : 0,
-                        moveSpeed: 1.8 + diff * 1.4,
-                        phase: step * 1.1
-                    });
-                    trackBounds(midX + 3.5, midZ, bridgeW, bridgeLen);
-                    addCoin(midX, cy + 1.15, midZ, coinCounter++);
+                cx += lateralShift;
+                cy = Math.max(-1.0, cy + stepUp);
+                cz -= gap;
 
-                    cz = midZ - bridgeLen * 0.5 - 3.3;
-                    cx = midX + turnOffset * 0.7;
-                    const nextIsMover = step % 3 === 0;
-                    addPlatform(cx, cy - 0.5, cz, 4.6, 1, 4.6, themeColor, {
-                        moveAxis: nextIsMover ? 'y' : null,
-                        moveAmp: nextIsMover ? 1.2 + diff * 0.7 : 0,
-                        moveSpeed: 2.0 + diff * 1.2,
-                        phase: step * 0.8
+                const pattern = (s + clamped) % 5;
+
+                if (pattern === 0) {
+                    const bridgeLen = 8.5 + diff * 2.5;
+                    const bridgeW = Math.max(3.1, 4.3 - diff * 1.0);
+                    addPlatform(cx, cy - 0.4, cz - bridgeLen * 0.5, bridgeW, 0.8, bridgeLen, baseColor, {
+                        moveAxis: s > 2 ? 'x' : null,
+                        moveAmp: s > 2 ? (1.1 + diff * 1.3) : 0,
+                        moveSpeed: 1.3 + diff * 1.1,
+                        phase: s * 0.9
                     });
-                    trackBounds(cx, cz, 4.6, 4.6);
-                } else if (patternIndex === 1) {
-                    // Escalera de 6 peldaños más altos y desviados
-                    const stairCount = 6;
-                    for (let s = 1; s <= stairCount; s++) {
-                        cz -= 3.95;
-                        cy += 1.22;
-                        cx += (s % 2 === 0 ? 1 : -1) * (1.4 + diff * 0.9);
-                        addPlatform(cx, cy - 0.4, cz, 3.2, 0.8, 2.7, 0x0ea5e9);
-                        trackBounds(cx, cz, 3.2, 2.7);
-                        if (s === 3 || s === 5) addCoin(cx, cy + 1.1, cz, coinCounter++);
+                    if (s % 2 === 0) {
+                        addLavaZone(cx, cy + 0.06, cz - bridgeLen * 0.5, Math.min(2.1, bridgeW * 0.52), 0.18, 1.6);
                     }
-                } else if (patternIndex === 2) {
-                    // Pasillo estrecho con bloques de lava alternados
-                    const laneW = 6.6;
-                    const laneL = 13.5;
-                    const laneZ = cz - laneL * 0.5 - 3.2;
-                    addPlatform(cx, cy - 0.5, laneZ, laneW, 1, laneL, 0x475569);
-                    trackBounds(cx, laneZ, laneW, laneL);
-
-                    addLavaBlock(cx - 1.6, cy + 0.18, laneZ - 3.6, 3.1, 0.48, 2.6);
-                    addLavaBlock(cx + 1.6, cy + 0.18, laneZ - 0.4, 3.1, 0.48, 2.6);
-                    addLavaBlock(cx - 1.4, cy + 0.18, laneZ + 2.8, 3.2, 0.48, 2.6);
-                    addCoin(cx, cy + 1.3, laneZ - 4.8, coinCounter++);
-
-                    cz = laneZ - laneL * 0.5 - 3.2;
-                    addPlatform(cx, cy - 0.5, cz, 4.8, 1, 4.8, themeColor);
-                    trackBounds(cx, cz, 4.8, 4.8);
-                } else if (patternIndex === 3) {
-                    // Plataforma con barras giratorias dobles y más rápidas
-                    const platW = 7.6;
-                    const platL = 8.4;
-                    const platZ = cz - 7.2;
-                    addPlatform(cx, cy - 0.5, platZ, platW, 1, platL, 0x6366f1);
-                    trackBounds(cx, platZ, platW, platL);
-
-                    const armLen = Math.min(3.9, 3.1 + diff * 0.8);
-                    const spinSpeed = (2.6 + diff * 2.2) * (step % 2 === 0 ? 1 : -1);
-                    addSpinner(cx, cy + 0.65, platZ - 1.6, armLen, spinSpeed, 0.48);
-                    addSpinner(cx, cy + 0.65, platZ + 1.8, armLen * 0.9, -spinSpeed * 1.15, 0.48);
-                    addCoin(cx + 2.4, cy + 1.2, platZ, coinCounter++);
-
-                    cz = platZ - 6.4;
-                    addPlatform(cx, cy - 0.5, cz, 4.6, 1, 4.6, themeColor);
-                    trackBounds(cx, cz, 4.6, 4.6);
+                    addCoin(cx, cy + 1.2, cz - bridgeLen * 0.5);
+                    cz -= bridgeLen;
+                } else if (pattern === 1) {
+                    const stepCount = 3;
+                    for (let k = 0; k < stepCount; k++) {
+                        const sx = cx + Math.cos(k * 1.6 + s) * (1.5 + diff * 1.4);
+                        const sy = cy + k * 0.65;
+                        const sz = cz - (k + 1) * (3.1 + diff * 0.7);
+                        const sw = Math.max(2.6, 3.6 - diff * 0.8);
+                        addPlatform(sx, sy - 0.35, sz, sw, 0.7, 3.0, accentColor, {
+                            moveAxis: (k === 1 && s > 3) ? 'y' : null,
+                            moveAmp: (k === 1 && s > 3) ? 0.65 : 0,
+                            moveSpeed: 1.5 + diff,
+                            phase: k + s
+                        });
+                        if (k === 1) addCoin(sx, sy + 1.1, sz);
+                    }
+                    cz -= stepCount * (3.1 + diff * 0.7);
+                } else if (pattern === 2) {
+                    const deckLen = 9.0;
+                    const deckW = 6.2;
+                    addPlatform(cx, cy - 0.45, cz - deckLen * 0.5, deckW, 0.9, deckLen, 0x334155);
+                    addSpinner(cx, cy + 0.65, cz - deckLen * 0.5, Math.min(5.6, deckW - 0.5), 1.45 + diff * 1.35);
+                    addCoin(cx, cy + 1.4, cz - deckLen * 0.75);
+                    cz -= deckLen;
+                } else if (pattern === 3) {
+                    const towerH = 4.2;
+                    const towerW = 5.4;
+                    addPlatform(cx, cy + towerH * 0.5 - 0.5, cz - 2.6, towerW, towerH, 4.8, 0x475569);
+                    addLadder(cx, cy + towerH * 0.5 - 0.4, cz - 0.12, 1.3, towerH + 0.4, 0.35, 0xf59e0b);
+                    cy += towerH - 0.4;
+                    addCoin(cx, cy + 1.2, cz - 2.6);
+                    cz -= 4.8;
                 } else {
-                    // Torre alta con escalera vertical y salto exigente
-                    const towerZ = cz - 6.4;
-                    const towerH = 8.4;
-                    addPlatform(cx, cy + towerH * 0.5 - 0.5, towerZ, 4.8, towerH, 4.6, 0x334155);
-                    trackBounds(cx, towerZ, 4.8, 4.6);
-                    addLadder(cx, cy, towerZ + 2.45, towerH + 0.4, 1.9);
-                    addCoin(cx, cy + towerH + 1.2, towerZ, coinCounter++);
-
-                    cy += towerH;
-                    cz = towerZ - 6.0;
-                    addPlatform(cx, cy - 0.5, cz, 4.6, 1, 4.6, themeColor);
-                    trackBounds(cx, cz, 4.6, 4.6);
+                    const p1x = cx - 1.6;
+                    const p2x = cx + 1.6;
+                    const p1z = cz - 2.8;
+                    const p2z = cz - 6.2;
+                    addPlatform(p1x, cy - 0.35, p1z, 3.2, 0.7, 3.2, baseColor);
+                    addPlatform(p2x, cy - 0.35, p2z, 3.2, 0.7, 3.2, accentColor);
+                    addCoin(p1x, cy + 1.1, p1z);
+                    cz -= 7.8;
                 }
 
-                // Checkpoints intermedios (player.spawn solo cambia al tocarlos)
-                if (step === Math.floor(stageCount / 2) || step === stageCount - 2) {
-                    addCheckpoint(cx, cy, cz, ++checkpointCounter);
+                // Piso ancho y tranquilo intermedio cada pocas etapas para respirar y planificar el siguiente salto
+                if (s % 2 === 1 && s < stageCount) {
+                    addSafeRestPlatform(cx, cy - 0.5, cz - 3.2, 11.5, 9.0, 0x334155);
+                    cz -= 7.2;
+                }
+
+                minX = Math.min(minX, cx - 8);
+                maxX = Math.max(maxX, cx + 8);
+                minZ = Math.min(minZ, cz - 8);
+                maxZ = Math.max(maxZ, cz + 8);
+
+                if (s % 4 === 0 && s < stageCount) {
+                    addSafeRestPlatform(cx, cy - 0.5, cz - 3.6, 12.5, 9.8, 0x1e293b);
+                    addCheckpoint(cx, cy, cz - 3.6, Math.floor(s / 4));
+                    cz -= 7.8;
                 }
             }
 
-            // Plataforma final y portal de meta
-            cz -= 7.2;
-            addPlatform(cx, cy - 0.5, cz, 8.0, 1, 8.0, 0x059669);
-            trackBounds(cx, cz, 8.0, 8.0);
-            addPortal(cx, cy, cz - 1.5);
+            cz -= 3.6;
+            addSafeRestPlatform(cx, cy - 0.5, cz - 4.0, 13.0, 11.0, 0x0f172a);
+            addPortal(cx, cy, cz - 4.2);
 
-            // Mar de lava 3D animado con relieve y base volcánica
-            const lavaFloorY = -9.5;
-            const floorW = (maxX - minX) + 44;
-            const floorD = (maxZ - minZ) + 44;
-            const lavaTex = createLavaTexture();
-
-            const lavaGeo = new THREE.PlaneGeometry(floorW, floorD, 64, 64);
-            const posAttr = lavaGeo.attributes.position;
-            for (let i = 0; i < posAttr.count; i++) {
-                const vx = posAttr.getX(i);
-                const vy = posAttr.getY(i);
-                const wave = Math.sin(vx * 0.25) * Math.cos(vy * 0.25) * 0.85;
-                posAttr.setZ(i, wave);
-            }
-            lavaGeo.computeVertexNormals();
-
-            const lavaFloorMat = new THREE.MeshStandardMaterial({
-                map: lavaTex,
-                emissive: 0xff3b00,
-                emissiveMap: lavaTex,
-                emissiveIntensity: 0.85,
-                roughness: 0.25,
-                metalness: 0.1
-            });
-            lavaFloorMesh = new THREE.Mesh(lavaGeo, lavaFloorMat);
-            lavaFloorMesh.rotation.x = -Math.PI / 2;
-            lavaFloorMesh.position.set((minX + maxX) * 0.5, lavaFloorY, (minZ + maxZ) * 0.5);
-            levelGroup.add(lavaFloorMesh);
-
-            const crustMat = new THREE.MeshStandardMaterial({
-                color: 0x1c0606,
-                roughness: 0.9,
-                metalness: 0.1
-            });
-            lavaCrustMesh = new THREE.Mesh(new THREE.BoxGeometry(floorW, 4, floorD), crustMat);
-            lavaCrustMesh.position.set((minX + maxX) * 0.5, lavaFloorY - 2.6, (minZ + maxZ) * 0.5);
-            levelGroup.add(lavaCrustMesh);
+            minX = Math.min(minX, cx - 10);
+            maxX = Math.max(maxX, cx + 10);
+            minZ = Math.min(minZ, cz - 10);
+            maxZ = Math.max(maxZ, cz + 10);
 
             buildCircuitWall(minX, maxX, minZ, maxZ, lavaFloorY);
+            buildOpenWorldScenery(minX, maxX, minZ, maxZ, lavaFloorY);
+            initLavaSplashPool(minX, maxX, minZ, maxZ, lavaFloorY);
             updateHud();
             showToast(`Nivel ${clamped} (${stageCount} etapas) — ¡Llegada al portal!`, 2400);
         }
 
-        function respawnPlayer(reasonMsg = '¡Caíste en la lava!') {
-            sfxLava();
-            showToast(reasonMsg, 1500);
+        function respawnPlayer(reasonMsg = '¡Reapareciste en el checkpoint!') {
+            if (!player || !player.pos || !player.spawn) return;
             player.pos.copy(player.spawn);
-            player.vel.set(0, 0, 0);
+            if (player.vel) player.vel.set(0, 0, 0);
             player.onGround = false;
+            showToast(reasonMsg, 1600);
         }
 
-        function completeLevel() {
-            sfxPortal();
+        function completeCurrentLevel() {
             const finishedLevel = state.currentLevel;
-            state.coins += 15;
-
+            state.coins += 15 + finishedLevel * 2;
             if (finishedLevel >= state.unlockedLevel && finishedLevel < TOTAL_LEVELS) {
                 state.unlockedLevel = finishedLevel + 1;
             }
-            if (finishedLevel < TOTAL_LEVELS) {
-                state.currentLevel = finishedLevel + 1;
-            } else {
-                state.currentLevel = 1;
-            }
             saveState();
             updateHud();
+            sfxPortal();
 
             if (finishedLevel < TOTAL_LEVELS) {
-                showToast(`¡Nivel ${finishedLevel} completado! +15 monedas`, 2200);
-                buildLevel(state.currentLevel);
+                const nextLvl = finishedLevel + 1;
+                showToast(`¡Nivel ${finishedLevel} completado! Pasando al nivel ${nextLvl}...`, 2200);
+                setTimeout(() => {
+                    if (state.mode === 'playing') {
+                        buildLevel(nextLvl);
+                    }
+                }, 450);
             } else {
-                showToast('¡Completaste los 30 niveles del Obby 3D! +15 monedas', 3200);
-                buildLevel(1);
+                showToast('¡Completaste los 30 niveles de Obby 3D!', 3200);
+                setTimeout(() => {
+                    setMode('lobby');
+                }, 1400);
+            }
+        }
+
+        function updateHazardsAndPickups(dt, elapsed) {
+            if (!player || !player.pos) return;
+
+            if (lavaFloorMesh && lavaFloorMesh.material && lavaFloorMesh.material.map) {
+                lavaFloorMesh.material.map.offset.x = elapsed * 0.085;
+                lavaFloorMesh.material.map.offset.y = Math.sin(elapsed * 0.6) * 0.04 + elapsed * 0.055;
+            }
+
+            // Ondulación fluida del mar de lava
+            if (lavaWaveGeo && lavaWaveBasePos) {
+                const posAttr = lavaWaveGeo.attributes.position;
+                const arr = posAttr.array;
+                for (let i = 0; i < arr.length; i += 3) {
+                    const bx = lavaWaveBasePos[i];
+                    const bz = lavaWaveBasePos[i + 2];
+                    const wave =
+                        Math.sin(bx * 0.075 + elapsed * 2.1) * 0.28 +
+                        Math.cos(bz * 0.085 - elapsed * 1.75) * 0.24 +
+                        Math.sin((bx + bz) * 0.045 + elapsed * 1.4) * 0.16;
+                    arr[i + 1] = lavaWaveBasePos[i + 1] + wave;
+                }
+                posAttr.needsUpdate = true;
+                lavaWaveGeo.computeVertexNormals();
+            }
+
+            updateLavaSplashes(dt);
+
+            for (const lz of lavaZones) {
+                if (lz.tex) {
+                    lz.tex.offset.x = elapsed * 0.24;
+                    lz.tex.offset.y = -elapsed * 0.19;
+                }
+                if (lz.mesh && typeof lz.baseY === 'number') {
+                    lz.mesh.position.y = lz.baseY + Math.sin(elapsed * 3.2 + lz.x) * 0.05;
+                }
+                const halfW = lz.w * 0.5 + player.radius * 0.65;
+                const halfD = lz.d * 0.5 + player.radius * 0.65;
+                const withinX = Math.abs(player.pos.x - lz.x) <= halfW;
+                const withinZ = Math.abs(player.pos.z - lz.z) <= halfD;
+                const withinY = player.pos.y <= lz.y + lz.h * 0.5 + 0.35 && player.pos.y + player.height >= lz.y - lz.h * 0.5;
+                if (withinX && withinZ && withinY) {
+                    sfxLava();
+                    respawnPlayer('¡Tocaste un bloque de lava!');
+                    return;
+                }
+            }
+
+            for (const sp of spinners) {
+                sp.angle += sp.speed * dt;
+                sp.pivot.rotation.y = sp.angle;
+
+                const cosA = Math.cos(sp.angle);
+                const sinA = Math.sin(sp.angle);
+                const relX = player.pos.x - sp.x;
+                const relZ = player.pos.z - sp.z;
+
+                const localAlong = relX * cosA - relZ * sinA;
+                const localPerp = relX * sinA + relZ * cosA;
+                const withinY = Math.abs((player.pos.y + 0.85) - sp.y) <= 0.85;
+
+                if (
+                    withinY &&
+                    Math.abs(localAlong) <= sp.length * 0.5 + player.radius * 0.5 &&
+                    Math.abs(localPerp) <= sp.thickness * 0.5 + player.radius * 0.55
+                ) {
+                    sfxLava();
+                    respawnPlayer('¡Te golpeó el rodillo giratorio!');
+                    return;
+                }
+            }
+
+            for (const c of coins) {
+                if (c.collected) continue;
+                c.mesh.rotation.y += 2.6 * dt;
+                c.mesh.position.y = c.baseY + Math.sin(elapsed * 3.5 + c.phase) * 0.16;
+
+                const dist = Math.hypot(player.pos.x - c.x, player.pos.z - c.z, (player.pos.y + 0.9) - c.mesh.position.y);
+                if (dist <= 1.15) {
+                    c.collected = true;
+                    c.mesh.visible = false;
+                    state.coins += 1;
+                    saveState();
+                    updateHud();
+                    sfxCoin();
+                }
+            }
+
+            if (portalMesh) {
+                portalMesh.ring.rotation.z += 1.4 * dt;
+                portalMesh.core.rotation.y -= 1.8 * dt;
+            }
+
+            if (portalPos) {
+                const pDist = Math.hypot(player.pos.x - portalPos.x, player.pos.z - portalPos.z, player.pos.y - (portalPos.y - 1.4));
+                if (pDist <= 2.25) {
+                    completeCurrentLevel();
+                }
             }
         }
 
         // =========================================================================
-        // CONTROLES (TECLADO, JOYSTICK VIRTUAL TÁCTIL Y CÁMARA EN TERCERA PERSONA)
+        // CONTROLES (TECLADO, JOYSTICK TÁCTIL Y CÁMARA)
         // =========================================================================
-        const keys = {
-            w: false, a: false, s: false, d: false,
-            ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false,
-            space: false
-        };
-
-        const joyInput = {
-            active: false,
-            pointerId: null,
-            x: 0,
-            y: 0,
-            maxRadius: 42
-        };
-
-        let jumpPressed = false;
-        let camTouchId = null;
+        const keys = { w: false, a: false, s: false, d: false, space: false };
+        const joyVec = { x: 0, y: 0 };
+        let joyPointerId = null;
+        let camPointerId = null;
         let lastCamX = 0;
         let lastCamY = 0;
-
-        function triggerJump() {
-            if (state.mode !== 'playing') return;
-            if (player.onGround) {
-                player.vel.y = 12.6;
-                player.onGround = false;
-                sfxJump();
-            }
-        }
+        let jumpPressed = false;
 
         function resetJoystickKnob() {
-            joyInput.active = false;
-            joyInput.pointerId = null;
-            joyInput.x = 0;
-            joyInput.y = 0;
+            joyPointerId = null;
+            joyVec.x = 0;
+            joyVec.y = 0;
             const knob = document.getElementById('joystick-knob');
             if (knob) {
                 knob.style.transform = 'translate(0px, 0px)';
             }
         }
 
-        function updateJoystickFromClient(clientX, clientY) {
-            const zone = document.getElementById('joystick-zone');
-            const knob = document.getElementById('joystick-knob');
-            if (!zone || !knob) return;
-            const rect = zone.getBoundingClientRect();
-            const cx = rect.left + rect.width * 0.5;
-            const cy = rect.top + rect.height * 0.5;
-
-            let dx = clientX - cx;
-            let dy = clientY - cy;
-            const dist = Math.hypot(dx, dy);
-            if (dist > joyInput.maxRadius) {
-                dx = (dx / dist) * joyInput.maxRadius;
-                dy = (dy / dist) * joyInput.maxRadius;
+        function triggerJump() {
+            if (!player || !player.vel) return;
+            if (player.onGround) {
+                player.vel.y = 12.2;
+                player.onGround = false;
+                sfxJump();
             }
-
-            joyInput.x = dx / joyInput.maxRadius;
-            joyInput.y = dy / joyInput.maxRadius;
-            knob.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
         }
 
         function bindControls() {
             window.addEventListener('keydown', (e) => {
-                if (e.code === 'Space') {
+                const k = e.key.toLowerCase();
+                if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
+                if (k === 's' || e.key === 'ArrowDown') keys.s = true;
+                if (k === 'a' || e.key === 'ArrowLeft') keys.a = true;
+                if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
+                if (e.code === 'Space' || k === ' ') {
                     keys.space = true;
-                    jumpPressed = true;
-                    if (state.mode === 'playing') e.preventDefault();
-                } else if (e.key in keys) {
-                    keys[e.key] = true;
+                    if (state.mode === 'playing') triggerJump();
                 }
             });
 
             window.addEventListener('keyup', (e) => {
-                if (e.code === 'Space') {
-                    keys.space = false;
-                    jumpPressed = false;
-                } else if (e.key in keys) {
-                    keys[e.key] = false;
-                }
+                const k = e.key.toLowerCase();
+                if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
+                if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+                if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
+                if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
+                if (e.code === 'Space' || k === ' ') keys.space = false;
             });
 
             const joyZone = document.getElementById('joystick-zone');
+            const knob = document.getElementById('joystick-knob');
+            const maxRadius = 38;
+
             if (joyZone) {
                 joyZone.addEventListener('pointerdown', (e) => {
-                    if (state.mode !== 'playing') return;
                     e.stopPropagation();
+                    joyPointerId = e.pointerId;
                     joyZone.setPointerCapture(e.pointerId);
-                    joyInput.active = true;
-                    joyInput.pointerId = e.pointerId;
-                    updateJoystickFromClient(e.clientX, e.clientY);
+                    updateJoystickFromEvent(e);
                 });
 
                 joyZone.addEventListener('pointermove', (e) => {
-                    if (!joyInput.active || e.pointerId !== joyInput.pointerId) return;
+                    if (e.pointerId !== joyPointerId) return;
                     e.stopPropagation();
-                    updateJoystickFromClient(e.clientX, e.clientY);
+                    updateJoystickFromEvent(e);
                 });
 
                 const endJoy = (e) => {
-                    if (e.pointerId === joyInput.pointerId) {
-                        e.stopPropagation();
-                        resetJoystickKnob();
-                    }
+                    if (e.pointerId !== joyPointerId) return;
+                    e.stopPropagation();
+                    resetJoystickKnob();
                 };
                 joyZone.addEventListener('pointerup', endJoy);
                 joyZone.addEventListener('pointercancel', endJoy);
+            }
+
+            function updateJoystickFromEvent(e) {
+                if (!joyZone || !knob) return;
+                const rect = joyZone.getBoundingClientRect();
+                const cx = rect.left + rect.width * 0.5;
+                const cy = rect.top + rect.height * 0.5;
+                let dx = e.clientX - cx;
+                let dy = e.clientY - cy;
+                const dist = Math.hypot(dx, dy);
+                if (dist > maxRadius) {
+                    dx = (dx / dist) * maxRadius;
+                    dy = (dy / dist) * maxRadius;
+                }
+                knob.style.transform = `translate(${dx}px, ${dy}px)`;
+                joyVec.x = dx / maxRadius;
+                joyVec.y = dy / maxRadius;
             }
 
             const jumpBtn = document.getElementById('jump-btn');
@@ -1141,186 +1512,70 @@
             if (canvas) {
                 canvas.addEventListener('pointerdown', (e) => {
                     if (state.mode !== 'playing') return;
-                    if (camTouchId === null && e.pointerId !== joyInput.pointerId) {
-                        camTouchId = e.pointerId;
-                        lastCamX = e.clientX;
-                        lastCamY = e.clientY;
-                    }
+                    if (camPointerId !== null) return;
+                    camPointerId = e.pointerId;
+                    lastCamX = e.clientX;
+                    lastCamY = e.clientY;
                 });
 
-                canvas.addEventListener('pointermove', (e) => {
-                    if (state.mode !== 'playing' || e.pointerId !== camTouchId) return;
+                window.addEventListener('pointermove', (e) => {
+                    if (e.pointerId !== camPointerId) return;
                     const dx = e.clientX - lastCamX;
                     const dy = e.clientY - lastCamY;
                     lastCamX = e.clientX;
                     lastCamY = e.clientY;
 
                     camCtrl.yaw -= dx * 0.0065;
-                    camCtrl.pitch = Math.min(1.15, Math.max(0.08, camCtrl.pitch + dy * 0.0055));
+                    camCtrl.pitch = Math.max(0.12, Math.min(1.15, camCtrl.pitch + dy * 0.0055));
                 });
 
-                const releaseCam = (e) => {
-                    if (e.pointerId === camTouchId) {
-                        camTouchId = null;
+                const endCam = (e) => {
+                    if (e.pointerId === camPointerId) {
+                        camPointerId = null;
                     }
                 };
-                canvas.addEventListener('pointerup', releaseCam);
-                canvas.addEventListener('pointercancel', releaseCam);
-
-                canvas.addEventListener('wheel', (e) => {
-                    if (state.mode !== 'playing') return;
-                    camCtrl.distance = Math.min(camCtrl.maxDist, Math.max(camCtrl.minDist, camCtrl.distance + e.deltaY * 0.005));
-                }, { passive: true });
-            }
-        }
-
-        // =========================================================================
-        // ACTUALIZACIÓN FÍSICA, OBSTÁCULOS Y CÁMARA
-        // =========================================================================
-        function updatePlatforms(elapsed) {
-            for (const p of platforms) {
-                const prevX = p.mesh.position.x;
-                const prevY = p.mesh.position.y;
-                const prevZ = p.mesh.position.z;
-
-                let nx = p.baseX;
-                let ny = p.baseY;
-                let nz = p.baseZ;
-
-                if (p.moveAxis === 'x') {
-                    nx = p.baseX + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
-                } else if (p.moveAxis === 'y') {
-                    ny = p.baseY + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
-                } else if (p.moveAxis === 'z') {
-                    nz = p.baseZ + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
-                }
-
-                p.mesh.position.set(nx, ny, nz);
-                p.x = nx;
-                p.y = ny;
-                p.z = nz;
-                p.dx = nx - prevX;
-                p.dy = ny - prevY;
-                p.dz = nz - prevZ;
-            }
-        }
-
-        function updateHazardsAndPickups(dt, elapsed) {
-            if (lavaFloorMesh && lavaFloorMesh.geometry && lavaFloorMesh.geometry.attributes.position) {
-                const posAttr = lavaFloorMesh.geometry.attributes.position;
-                for (let i = 0; i < posAttr.count; i++) {
-                    const vx = posAttr.getX(i);
-                    const vy = posAttr.getY(i);
-                    const wave = Math.sin(vx * 0.25 + elapsed * 2.2) * Math.cos(vy * 0.25 + elapsed * 1.8) * 0.95;
-                    posAttr.setZ(i, wave);
-                }
-                posAttr.needsUpdate = true;
-                lavaFloorMesh.geometry.computeVertexNormals();
-            }
-
-            if (lavaFloorMesh && lavaFloorMesh.material && lavaFloorMesh.material.map) {
-                lavaFloorMesh.material.map.offset.x = (elapsed * 0.05) % 1;
-                lavaFloorMesh.material.map.offset.y = (elapsed * 0.04) % 1;
-            }
-
-            if (portalMesh) {
-                portalMesh.rotation.y = elapsed * 1.4;
-            }
-
-            for (const sp of spinners) {
-                sp.pivot.rotation.y += sp.speed * dt;
-                const angle = sp.pivot.rotation.y;
-                const cosA = Math.cos(angle);
-                const sinA = Math.sin(angle);
-
-                const relX = player.pos.x - sp.x;
-                const relZ = player.pos.z - sp.z;
-                const localX = relX * cosA + relZ * sinA;
-                const localZ = -relX * sinA + relZ * cosA;
-
-                const playerCenterY = player.pos.y + player.height * 0.5;
-                if (
-                    Math.abs(localX) <= sp.armLength + player.radius * 0.7 &&
-                    Math.abs(localZ) <= sp.thickness * 0.5 + player.radius * 0.7 &&
-                    Math.abs(playerCenterY - sp.y) <= sp.thickness * 0.5 + 0.65
-                ) {
-                    respawnPlayer('¡Te golpeó el rodillo giratorio!');
-                    return;
-                }
-            }
-
-            for (const lz of lavaZones) {
-                const halfW = lz.w * 0.5 + player.radius * 0.5;
-                const halfD = lz.d * 0.5 + player.radius * 0.5;
-                const topY = lz.y + lz.h * 0.5;
-                const botY = lz.y - lz.h * 0.5;
-                if (
-                    Math.abs(player.pos.x - lz.x) <= halfW &&
-                    Math.abs(player.pos.z - lz.z) <= halfD &&
-                    player.pos.y <= topY + 0.15 &&
-                    player.pos.y + 0.8 >= botY
-                ) {
-                    respawnPlayer('¡Pisaste lava!');
-                    return;
-                }
-            }
-
-            for (const c of coins) {
-                if (c.collected) continue;
-                c.mesh.rotation.z = elapsed * 2.6;
-                c.mesh.position.y = c.y + Math.sin(elapsed * 3.2 + c.id) * 0.14;
-
-                const dx = player.pos.x - c.x;
-                const dy = (player.pos.y + 0.9) - c.mesh.position.y;
-                const dz = player.pos.z - c.z;
-                if (dx * dx + dy * dy + dz * dz <= 1.25 * 1.25) {
-                    c.collected = true;
-                    c.mesh.visible = false;
-                    state.coins += 1;
-                    saveState();
-                    sfxCoin();
-                    updateHud();
-                }
-            }
-
-            for (const cp of checkpoints) {
-                if (cp.reached) continue;
-                const dx = Math.abs(player.pos.x - cp.x);
-                const dz = Math.abs(player.pos.z - cp.z);
-                const dy = Math.abs(player.pos.y - cp.y);
-                if (dx <= 1.8 && dz <= 1.8 && dy <= 1.6) {
-                    cp.reached = true;
-                    cp.flagMat.color.setHex(0x22c55e);
-                    cp.flagMat.emissive.setHex(0x14532d);
-                    player.spawn.set(cp.x, cp.y + 0.1, cp.z);
-                    sfxCheckpoint();
-                    showToast(`¡Checkpoint ${cp.index} guardado!`, 1500);
-                }
-            }
-
-            if (portalPos) {
-                const dx = player.pos.x - portalPos.x;
-                const dy = (player.pos.y + 0.9) - portalPos.y;
-                const dz = player.pos.z - portalPos.z;
-                if (dx * dx + dy * dy + dz * dz <= 2.15 * 2.15) {
-                    completeLevel();
-                }
+                window.addEventListener('pointerup', endCam);
+                window.addEventListener('pointercancel', endCam);
             }
         }
 
         function updatePlayer(dt, elapsed) {
-            if (!player || !player.pos || !player.vel || !player.spawn) return;
-            if (state.mode !== 'playing') return;
+            if (!player || !player.pos || !player.vel) return;
+            if (state.mode !== 'playing') {
+                if (playerGroup) {
+                    playerGroup.position.copy(player.pos);
+                    playerGroup.rotation.y = Math.sin(elapsed * 0.9) * 0.35;
+                }
+                updateHazardsAndPickups(dt, elapsed);
+                return;
+            }
 
-            updatePlatforms(elapsed);
+            for (const p of platforms) {
+                p.dx = 0;
+                p.dy = 0;
+                p.dz = 0;
+                if (p.moveAxis === 'x') {
+                    const nextX = p.baseX + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
+                    p.dx = nextX - p.x;
+                    p.x = nextX;
+                } else if (p.moveAxis === 'y') {
+                    const nextY = p.baseY + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
+                    p.dy = nextY - p.y;
+                    p.y = nextY;
+                } else if (p.moveAxis === 'z') {
+                    const nextZ = p.baseZ + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
+                    p.dz = nextZ - p.z;
+                    p.z = nextZ;
+                }
+                p.mesh.position.set(p.x, p.y, p.z);
+            }
 
-            let moveX = joyInput.x;
-            let moveZ = joyInput.y;
-
-            if (keys.a || keys.ArrowLeft) moveX -= 1;
-            if (keys.d || keys.ArrowRight) moveX += 1;
-            if (keys.w || keys.ArrowUp) moveZ -= 1;
-            if (keys.s || keys.ArrowDown) moveZ += 1;
+            let moveX = joyVec.x;
+            let moveZ = joyVec.y;
+            if (keys.a) moveX -= 1;
+            if (keys.d) moveX += 1;
+            if (keys.w) moveZ -= 1;
+            if (keys.s) moveZ += 1;
 
             const mag = Math.hypot(moveX, moveZ);
             if (mag > 1) {
@@ -1328,26 +1583,21 @@
                 moveZ /= mag;
             }
 
-            const forwardX = -Math.sin(camCtrl.yaw);
-            const forwardZ = -Math.cos(camCtrl.yaw);
-            const rightX = Math.cos(camCtrl.yaw);
-            const rightZ = -Math.sin(camCtrl.yaw);
+            const sinY = Math.sin(camCtrl.yaw);
+            const cosY = Math.cos(camCtrl.yaw);
+            const wishX = moveX * cosY + moveZ * sinY;
+            const wishZ = -moveX * sinY + moveZ * cosY;
 
-            const wishX = forwardX * (-moveZ) + rightX * moveX;
-            const wishZ = forwardZ * (-moveZ) + rightZ * moveX;
-
-            const moveSpeed = 8.4;
-            player.vel.x = wishX * moveSpeed;
-            player.vel.z = wishZ * moveSpeed;
+            const speed = 7.4;
+            player.vel.x = wishX * speed;
+            player.vel.z = wishZ * speed;
 
             let onLadder = false;
             for (const ld of ladders) {
-                if (
-                    Math.abs(player.pos.x - ld.x) <= ld.halfW &&
-                    Math.abs(player.pos.z - ld.z) <= ld.halfD &&
-                    player.pos.y + player.height >= ld.minY &&
-                    player.pos.y <= ld.maxY
-                ) {
+                const withinX = Math.abs(player.pos.x - ld.x) <= ld.w * 0.5 + player.radius + 0.25;
+                const withinZ = Math.abs(player.pos.z - ld.z) <= ld.d * 0.5 + player.radius + 0.25;
+                const withinY = player.pos.y >= ld.y - ld.h * 0.5 - 0.5 && player.pos.y <= ld.y + ld.h * 0.5 + 0.6;
+                if (withinX && withinZ && withinY) {
                     onLadder = true;
                     break;
                 }
@@ -1378,20 +1628,46 @@
                 const withinX = Math.abs(player.pos.x - p.x) <= halfW;
                 const withinZ = Math.abs(player.pos.z - p.z) <= halfD;
 
-                if (withinX && withinZ && player.vel.y <= 0 && prevY >= topY - 0.35 && player.pos.y <= topY + 0.05) {
+                if (withinX && withinZ && player.vel.y <= 0 && prevY >= topY - 0.35 && player.pos.y <= topY + 0.08) {
                     player.pos.y = topY;
-                    player.vel.y = 0;
-                    groundedNow = true;
                     player.pos.x += p.dx;
                     player.pos.z += p.dz;
-                } else if (withinX && withinZ && player.pos.y < topY - 0.1 && player.pos.y + player.height > botY) {
-                    const overlapX = halfW - Math.abs(player.pos.x - p.x);
-                    const overlapZ = halfD - Math.abs(player.pos.z - p.z);
-                    if (overlapX < overlapZ) {
-                        player.pos.x += player.pos.x >= p.x ? overlapX : -overlapX;
-                    } else {
-                        player.pos.z += player.pos.z >= p.z ? overlapZ : -overlapZ;
+                    player.vel.y = 0;
+                    groundedNow = true;
+                } else if (withinX && withinZ && player.pos.y + player.height >= botY && prevY + player.height <= botY + 0.35 && player.vel.y > 0) {
+                    player.pos.y = botY - player.height;
+                    player.vel.y = 0;
+                }
+            }
+
+            for (const wm of wallMeshes) {
+                if (
+                    player.pos.x + player.radius > wm.minX &&
+                    player.pos.x - player.radius < wm.maxX &&
+                    player.pos.z + player.radius > wm.minZ &&
+                    player.pos.z - player.radius < wm.maxZ
+                ) {
+                    player.pos.x -= player.vel.x * dt;
+                    player.pos.z -= player.vel.z * dt;
+                }
+            }
+
+            for (const cp of checkpoints) {
+                if (cp.reached) continue;
+                const dx = Math.abs(player.pos.x - cp.x);
+                const dz = Math.abs(player.pos.z - cp.z);
+                const dy = Math.abs(player.pos.y - cp.y);
+                if (dx <= 1.8 && dz <= 1.8 && dy <= 1.6) {
+                    cp.reached = true;
+                    cp.flagMat.color.setHex(0x22c55e);
+                    cp.flagMat.emissive.setHex(0x14532d);
+                    if (cp.padMat) {
+                        cp.padMat.color.setHex(0x4ade80);
+                        cp.padMat.emissive.setHex(0x15803d);
                     }
+                    player.spawn.set(cp.x, cp.y + 0.1, cp.z);
+                    sfxCheckpoint();
+                    showToast(`¡Checkpoint ${cp.index} guardado!`, 1500);
                 }
             }
 
