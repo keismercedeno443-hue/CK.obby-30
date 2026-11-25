@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Obby 3D - 30 Niveles Largos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="handleThreeFallback()"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js" onerror="handleCannonFallback()"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #090d16;
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+        }
+        #game-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        #joystick-zone {
+            position: fixed;
+            left: 24px;
+            bottom: 24px;
+            width: 132px;
+            height: 132px;
+            border-radius: 9999px;
+            background: rgba(15, 23, 42, 0.45);
+            border: 2px solid rgba(255, 255, 255, 0.22);
+            backdrop-filter: blur(6px);
+            z-index: 20;
+            touch-action: none;
+        }
+        #joystick-knob {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 54px;
+            height: 54px;
+            margin-left: -27px;
+            margin-top: -27px;
+            border-radius: 9999px;
+            background: linear-gradient(145deg, #38bdf8, #2563eb);
+            border: 2px solid rgba(255, 255, 255, 0.65);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.55);
+            pointer-events: none;
+        }
+        #jump-btn {
+            position: fixed;
+            right: 28px;
+            bottom: 28px;
+            width: 88px;
+            height: 88px;
+            border-radius: 9999px;
+            background: linear-gradient(145deg, #fbbf24, #d97706);
+            border: 3px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 8px 24px rgba(217, 119, 6, 0.5);
+            z-index: 20;
+            touch-action: none;
+        }
+        #jump-btn:active {
+            transform: scale(0.94);
+        }
+        /* Aviso suave si el dispositivo está en vertical (retrato) */
+        #portrait-overlay {
+            display: none;
+        }
+        @media (orientation: portrait) {
+            #portrait-overlay {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Lienzo principal 3D -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Aviso para orientar en horizontal (landscape) -->
+    <div id="portrait-overlay" class="fixed inset-0 z-50 flex-col items-center justify-center p-6 bg-slate-950/95 text-white text-center">
+        <div class="w-16 h-16 rounded-2xl bg-sky-500/20 border border-sky-400/50 flex items-center justify-center text-3xl mb-4">
+            📱↔️
+        </div>
+        <h2 class="text-xl font-black mb-2">Gira tu dispositivo en horizontal</h2>
+        <p class="text-sm text-slate-300 max-w-xs">
+            Este Obby 3D está diseñado para jugarse en pantalla horizontal para mayor visibilidad y control.
+        </p>
+    </div>
+
+    <!-- HUD Superior del Juego -->
+    <div id="game-hud" class="hidden fixed top-3 left-3 right-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <button id="btn-hud-back" title="Volver al Lobby" class="bg-slate-900/85 hover:bg-slate-800 text-white w-9 h-9 rounded-full border border-white/15 text-sm font-black shadow-lg active:scale-95 transition flex items-center justify-center">
+                ✕
+            </button>
+            <div class="bg-slate-900/80 text-white px-3.5 py-2 rounded-2xl border border-white/15 backdrop-blur-md shadow-lg">
+                <span class="text-xs uppercase tracking-wider text-sky-300 font-bold">Nivel</span>
+                <span id="hud-level" class="text-base font-black ml-1">1 / 30</span>
+            </div>
+            <div class="bg-slate-900/80 text-amber-300 px-3.5 py-2 rounded-2xl border border-white/15 backdrop-blur-md shadow-lg font-extrabold text-sm">
+                🪙 <span id="hud-coins">0</span>
+            </div>
+            <div class="hidden sm:flex bg-slate-900/80 text-emerald-300 px-3 py-2 rounded-2xl border border-white/15 backdrop-blur-md shadow-lg font-bold text-xs">
+                Meta: <span id="hud-distance" class="ml-1 font-black">0m</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <button id="btn-hud-levels" class="bg-slate-900/85 hover:bg-slate-800 text-white px-3 py-2 rounded-2xl border border-white/15 text-xs font-extrabold shadow-lg active:scale-95 transition">
+                Niveles
+            </button>
+            <button id="btn-hud-sound" class="bg-slate-900/85 hover:bg-slate-800 text-white px-3 py-2 rounded-2xl border border-white/15 text-xs font-extrabold shadow-lg active:scale-95 transition">
+                🔊
+            </button>
+            <button id="btn-hud-lobby" class="bg-rose-600/90 hover:bg-rose-500 text-white px-3 py-2 rounded-2xl border border-white/20 text-xs font-extrabold shadow-lg active:scale-95 transition">
+                Lobby
+            </button>
+        </div>
+    </div>
+
+    <!-- Mensaje flotante en pantalla -->
+    <div id="toast-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900/90 text-white px-4 py-2 rounded-2xl border border-sky-400/40 text-xs sm:text-sm font-bold shadow-xl pointer-events-none text-center max-w-[90vw]">
+    </div>
+
+    <!-- Controles táctiles para móvil -->
+    <div id="joystick-zone" class="hidden">
+        <div id="joystick-knob"></div>
+    </div>
+    <button id="jump-btn" class="hidden flex flex-col items-center justify-center text-slate-950 font-black">
+        <span class="text-xl leading-none">▲</span>
+        <span class="text-[11px] tracking-wide mt-0.5">SALTAR</span>
+    </button>
+
+    <!-- Lobby Principal -->
+    <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+        <div class="w-full max-w-md bg-slate-900/95 border border-white/15 rounded-3xl p-6 text-white shadow-2xl">
+            <div class="text-center mb-5">
+                <span class="inline-block px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-extrabold uppercase tracking-wider mb-2">
+                    30 Niveles Largos 3D
+                </span>
+                <h1 class="text-3xl font-black tracking-tight">Obby 3D</h1>
+                <p class="text-slate-300 text-xs sm:text-sm mt-1">
+                    Recorridos largos de 12 a 16 etapas: caminos angostos, escaleras, lava saltarina y portales.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3 text-center">
+                    <div class="text-[11px] uppercase text-slate-400 font-bold">Nivel Actual</div>
+                    <div id="lobby-unlocked" class="text-xl font-black text-sky-400 mt-0.5">1 / 30</div>
+                </div>
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3 text-center">
+                    <div class="text-[11px] uppercase text-slate-400 font-bold">Monedas</div>
+                    <div id="lobby-coins" class="text-xl font-black text-amber-400 mt-0.5">🪙 0</div>
+                </div>
+            </div>
+
+            <div class="space-y-2.5">
+                <button id="btn-play" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-base shadow-lg active:scale-[0.99] transition">
+                    ▶ Jugar
+                </button>
+                <button id="btn-select-level" class="w-full py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 text-white font-extrabold text-sm shadow-lg active:scale-[0.99] transition">
+                    🗺️ Elegir Nivel
+                </button>
+                <button id="btn-toggle-sound" class="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-100 font-bold text-sm active:scale-[0.99] transition">
+                    🔊 Sonido y Música: Activado
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selector de Niveles -->
+    <div id="level-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div class="w-full max-w-lg bg-slate-900 border border-white/15 rounded-3xl p-5 text-white shadow-2xl max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-black">Seleccionar Nivel (1 - 30)</h2>
+                <button id="btn-close-levels" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold">
+                    Cerrar
+                </button>
+            </div>
+            <div id="levels-grid" class="grid grid-cols-5 gap-2 overflow-y-auto pr-1"></div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // RESPUESTAS DE RESPALDO DE LIBRERÍAS CDN
+        // =========================================================================
+        window.threeLoadFailed = false;
+        window.cannonLoadFailed = false;
+
+        function handleThreeFallback() {
+            window.threeLoadFailed = true;
+            const s = document.createElement('script');
+            s.src = 'https://unpkg.com/three@0.128.0/build/three.min.js';
+            document.head.appendChild(s);
+        }
+
+        function handleCannonFallback() {
+            window.cannonLoadFailed = true;
+            const s = document.createElement('script');
+            s.src = 'https://unpkg.com/cannon@0.6.2/build/cannon.min.js';
+            document.head.appendChild(s);
+        }
+
+        // Intento de bloqueo de orientación horizontal en navegadores compatibles
+        function tryLockLandscape() {
+            try {
+                if (screen.orientation && typeof screen.orientation.lock === 'function') {
+                    screen.orientation.lock('landscape').catch(() => {});
+                }
+            } catch (e) {
+                // Ignorado en navegadores que no permiten bloqueo de orientación
+            }
+        }
+
+        // =========================================================================
+        // ESTADO GLOBAL Y GUARDADO
+        // =========================================================================
+        const TOTAL_LEVELS = 30;
+        const STORAGE_KEY = 'obby3d_estado_v2';
+
+        const state = {
+            mode: 'lobby', // 'lobby' | 'playing'
+            currentLevel: 1,
+            unlockedLevel: 1,
+            coins: 0,
+            soundEnabled: true
+        };
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (typeof parsed.currentLevel === 'number') {
+                    state.currentLevel = Math.min(TOTAL_LEVELS, Math.max(1, parsed.currentLevel));
+                }
+                if (typeof parsed.unlockedLevel === 'number') {
+                    state.unlockedLevel = Math.min(TOTAL_LEVELS, Math.max(1, parsed.unlockedLevel));
+                }
+                if (typeof parsed.coins === 'number') {
+                    state.coins = Math.max(0, Math.floor(parsed.coins));
+                }
+                if (typeof parsed.soundEnabled === 'boolean') {
+                    state.soundEnabled = parsed.soundEnabled;
+                }
+            } catch (e) {
+                console.warn('No se pudo cargar el progreso guardado:', e);
+            }
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    currentLevel: state.currentLevel,
+                    unlockedLevel: state.unlockedLevel,
+                    coins: state.coins,
+                    soundEnabled: state.soundEnabled
+                }));
+            } catch (e) {
+                console.warn('No se pudo guardar el progreso:', e);
+            }
+        }
+
+        let toastTimeout = null;
+        function showToast(msg, duration = 2200) {
+            const el = document.getElementById('toast-banner');
+            if (!el) return;
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                el.classList.add('hidden');
+            }, duration);
+        }
+
+        // =========================================================================
+        // AUDIO Y MÚSICA DE FONDO (WEB AUDIO API)
+        // =========================================================================
+        let audioCtx = null;
+        let bgmTimer = null;
+        let bgmStep = 0;
+        const melodyNotes = [261.63, 329.63, 392.00, 523.25, 440.00, 392.00, 329.63, 349.23];
+        const bassNotes = [130.81, 130.81, 196.00, 196.00, 146.83, 146.83, 174.61, 196.00];
+
+        function getAudioCtx() {
+            if (!state.soundEnabled) return null;
+            try {
+                if (!audioCtx) {
+                    const Ctx = window.AudioContext || window.webkitAudioContext;
+                    if (Ctx) audioCtx = new Ctx();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(() => {});
+                }
+                return audioCtx;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function playTone(freq, duration, type = 'sine', volume = 0.08, endFreq = null) {
+            const ctx = getAudioCtx();
+            if (!ctx) return;
+            try {
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now);
+                if (endFreq !== null) {
+                    osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+                }
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(volume, now + 0.015);
+                gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + duration + 0.02);
+            } catch (e) {
+                // Ignorar errores de audio en navegadores restringidos
+            }
+        }
+
+        function sfxJump() {
+            playTone(230, 0.16, 'triangle', 0.11, 520);
+        }
+
+        function sfxCoin() {
+            playTone(784, 0.09, 'sine', 0.09, 1046.5);
+        }
+
+        function sfxCheckpoint() {
+            playTone(440, 0.11, 'sine', 0.09, 659.25);
+        }
+
+        function sfxPortal() {
+            playTone(523.25, 0.14, 'triangle', 0.11, 783.99);
+            setTimeout(() => playTone(783.99, 0.22, 'triangle', 0.11, 1046.5), 110);
+        }
+
+        function sfxLava() {
+            playTone(190, 0.24, 'sawtooth', 0.09, 75);
+        }
+
+        function startBgm() {
+            if (bgmTimer) return;
+            bgmTimer = setInterval(() => {
+                if (!state.soundEnabled || state.mode !== 'playing') return;
+                const idx = bgmStep % melodyNotes.length;
+                bgmStep += 1;
+                playTone(melodyNotes[idx], 0.22, 'triangle', 0.045);
+                if (idx % 2 === 0) {
+                    playTone(bassNotes[idx], 0.32, 'sine', 0.045);
+                }
+            }, 340);
+        }
+
+        ['pointerdown', 'touchstart', 'keydown'].forEach((evt) => {
+            window.addEventListener(evt, () => {
+                getAudioCtx();
+                if (state.soundEnabled) startBgm();
+                tryLockLandscape();
+            }, { passive: true });
+        });
+
+        // =========================================================================
+        // ESCENA THREE.JS, MUÑECO TIPO ROBLOX Y CIRCUITOS LARGOS (12-16 ETAPAS)
+        // =========================================================================
+        let scene, camera, renderer;
+        let cannonWorld = null;
+        let levelGroup, wallGroup;
+        let playerGroup, headMesh, torsoMesh, leftArmPivot, rightArmPivot, leftLegPivot, rightLegPivot;
+
+        const platforms = [];
+        const ladders = [];
+        const lavaZones = [];
+        const coins = [];
+        const spinners = [];
+        const lavaBalls = [];
+        const checkpoints = [];
+        const wallMeshes = [];
+        let lavaFloorMesh = null;
+        let portalMesh = null;
+        let portalPos = null;
+
+        const player = {
+            pos: new THREE.Vector3(0, 0.1, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            spawn: new THREE.Vector3(0, 0.1, 0),
+            radius: 0.42,
+            height: 1.85,
+            onGround: false,
+            yaw: 0,
+            walkCycle: 0
+        };
+
+        const camCtrl = {
+            yaw: 0,
+            pitch: 0.34,
+            distance: 9.5,
+            minDist: 4.5,
+            maxDist: 18.0
+        };
+
+        function createRobloxFaceTexture() {
+            const c = document.createElement('canvas');
+            c.width = 128;
+            c.height = 128;
+            const g = c.getContext('2d');
+            g.fillStyle = '#fde047';
+            g.fillRect(0, 0, 128, 128);
+            g.fillStyle = '#0f172a';
+            g.beginPath();
+            g.ellipse(42, 54, 8, 12, 0, 0, Math.PI * 2);
+            g.ellipse(86, 54, 8, 12, 0, 0, Math.PI * 2);
+            g.fill();
+            g.fillStyle = '#ffffff';
+            g.beginPath();
+            g.arc(44, 50, 3, 0, Math.PI * 2);
+            g.arc(88, 50, 3, 0, Math.PI * 2);
+            g.fill();
+            g.strokeStyle = '#0f172a';
+            g.lineWidth = 6;
+            g.lineCap = 'round';
+            g.beginPath();
+            g.arc(64, 72, 22, 0.15 * Math.PI, 0.85 * Math.PI);
+            g.stroke();
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        function createLavaTexture() {
+            const c = document.createElement('canvas');
+            c.width = 256;
+            c.height = 256;
+            const g = c.getContext('2d');
+            const grad = g.createLinearGradient(0, 0, 256, 256);
+            grad.addColorStop(0, '#dc2626');
+            grad.addColorStop(0.5, '#f97316');
+            grad.addColorStop(1, '#facc15');
+            g.fillStyle = grad;
+            g.fillRect(0, 0, 256, 256);
+
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 4; col++) {
+                    const x = col * 64 + 4;
+                    const y = row * 64 + 4;
+                    g.fillStyle = (row + col) % 2 === 0 ? 'rgba(255, 237, 213, 0.22)' : 'rgba(127, 29, 29, 0.28)';
+                    g.beginPath();
+                    g.roundRect(x, y, 56, 56, 10);
+          
