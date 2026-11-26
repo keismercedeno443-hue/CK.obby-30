@@ -153,7 +153,7 @@
         <div class="flex items-end justify-between gap-3">
             <div class="hidden sm:block pointer-events-none">
                 <span class="inline-block bg-slate-900/60 text-white/95 text-xs px-3.5 py-1 rounded-full backdrop-blur-sm">
-                    Izquierda: mover • Derecha: saltar / cámara
+                    Izquierda: mover • Derecha: saltar / cámara • 2 dedos: zoom
                 </span>
             </div>
         </div>
@@ -189,6 +189,8 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
+        const MIN_CAM_DIST = 3.5;
+        const MAX_CAM_DIST = 18.0;
 
         const LEVEL_1_FIXED_SPAWN = { x: 52.0, y: 4.6, z: -21.5 };
         const LEVEL_1_FACING_YAW = -1.89;
@@ -444,7 +446,6 @@
         const coins = [];
         const checkpoints = [];
         const lavaSplashes = [];
-        const aerialEnemies = [];
         const skyBlocks = [];
         const studTextureCache = new Map();
 
@@ -491,7 +492,7 @@
                     const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
                     const hits = camRay.intersectObjects(mapMeshes, true);
                     if (hits.length > 0) {
-                        const safeDist = Math.max(7.5, hits[0].distance - 0.85);
+                        const safeDist = Math.max(MIN_CAM_DIST, Math.min(camCtrl.distance, hits[0].distance - 0.85));
                         desiredPos.copy(target).addScaledVector(dir, safeDist);
                     }
                 }
@@ -787,7 +788,6 @@
             while (entitiesGroup.children.length > 0) entitiesGroup.remove(entitiesGroup.children[0]);
             coins.length = 0;
             checkpoints.length = 0;
-            aerialEnemies.length = 0;
         }
 
         function addCoin(x, y, z) {
@@ -809,39 +809,6 @@
             pad.position.set(x, y + 0.11, z);
             entitiesGroup.add(pad);
             checkpoints.push({ x, y: y + 0.25, z, stageNum, activated: false, pad });
-        }
-
-        function addAerialEnemy(kind, x, y, z, patrolRadius = 5.5, speed = 2.0) {
-            const group = new THREE.Group();
-            group.position.set(x, y, z);
-            const isDragon = kind === 'dragon';
-            const bodyMat = new THREE.MeshStandardMaterial({ color: isDragon ? 0x991b1b : 0x78350f, roughness: 0.45 });
-            const accentMat = new THREE.MeshStandardMaterial({
-                color: isDragon ? 0xf97316 : 0xfef08a,
-                emissive: isDragon ? 0xc2410c : 0x000000,
-                emissiveIntensity: isDragon ? 0.35 : 0,
-                roughness: 0.4
-            });
-            const body = new THREE.Mesh(new THREE.BoxGeometry(isDragon ? 1.25 : 0.85, isDragon ? 0.95 : 0.7, isDragon ? 2.15 : 1.3), bodyMat);
-            body.castShadow = true;
-            group.add(body);
-            const head = new THREE.Mesh(new THREE.BoxGeometry(isDragon ? 0.85 : 0.65, isDragon ? 0.75 : 0.6, isDragon ? 0.95 : 0.75), isDragon ? accentMat : bodyMat);
-            head.position.set(0, 0.35, isDragon ? -1.35 : -0.85);
-            group.add(head);
-            const leftWing = new THREE.Mesh(new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75), accentMat);
-            leftWing.position.set(isDragon ? -1.5 : -1.2, 0.15, 0);
-            group.add(leftWing);
-            const rightWing = new THREE.Mesh(new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75), accentMat);
-            rightWing.position.set(isDragon ? 1.5 : 1.2, 0.15, 0);
-            group.add(rightWing);
-            entitiesGroup.add(group);
-            aerialEnemies.push({
-                kind, group, leftWing, rightWing,
-                baseX: x, baseY: y, baseZ: z,
-                patrolRadius, speed,
-                alive: true,
-                phase: Math.random() * Math.PI * 2
-            });
         }
 
         function populateMapEntities() {
@@ -877,10 +844,6 @@
                     if (step % 3 === 0 && nextStageNumber <= TOTAL_LEVELS) {
                         addCheckpoint(px, surfY, pz, nextStageNumber);
                         nextStageNumber += 1;
-                    }
-                    if (step % 4 === 0) {
-                        const kind = step % 8 === 0 ? 'dragon' : (step % 2 === 0 ? 'eagle' : 'bird');
-                        addAerialEnemy(kind, px, surfY + 4.2, pz, 5.0, 1.9);
                     }
                 }
             }
@@ -1299,8 +1262,15 @@
             camTouchId: null,
             camLastX: 0,
             camLastY: 0,
-            camMoved: false
+            camMoved: false,
+            pinchActive: false,
+            pinchStartDist: 0,
+            pinchStartCamDist: 8.2
         };
+
+        function getTouchDistance(t1, t2) {
+            return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        }
 
         function updateDynamicJoystickVisual(visible, ox = 0, oy = 0, kx = 0, ky = 0) {
             const base = document.getElementById('dynamic-joy-base');
@@ -1343,6 +1313,16 @@
 
             canvas.addEventListener('touchstart', (e) => {
                 if (state.mode !== 'playing') return;
+
+                if (e.touches.length === 2) {
+                    input.pinchActive = true;
+                    input.pinchStartDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
+                    input.pinchStartCamDist = camCtrl.distance;
+                    input.camTouchId = null;
+                    input.camMoved = true;
+                    return;
+                }
+
                 const halfW = window.innerWidth * 0.5;
                 for (const t of e.changedTouches) {
                     if (t.clientX < halfW && !input.joyActive) {
@@ -1353,7 +1333,7 @@
                         input.joyVecX = 0;
                         input.joyVecY = 0;
                         updateDynamicJoystickVisual(true, t.clientX, t.clientY, 0, 0);
-                    } else if (t.clientX >= halfW && input.camTouchId === null) {
+                    } else if (t.clientX >= halfW && input.camTouchId === null && !input.pinchActive) {
                         input.camTouchId = t.identifier;
                         input.camLastX = t.clientX;
                         input.camLastY = t.clientY;
@@ -1364,6 +1344,14 @@
 
             canvas.addEventListener('touchmove', (e) => {
                 if (state.mode !== 'playing') return;
+
+                if (input.pinchActive && e.touches.length >= 2) {
+                    const currentDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
+                    const scale = input.pinchStartDist / currentDist;
+                    camCtrl.distance = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, input.pinchStartCamDist * scale));
+                    return;
+                }
+
                 for (const t of e.changedTouches) {
                     if (input.joyActive && t.identifier === input.joyTouchId) {
                         let dx = t.clientX - input.joyOriginX;
@@ -1389,6 +1377,9 @@
             }, { passive: true });
 
             const onTouchEnd = (e) => {
+                if (e.touches.length < 2) {
+                    input.pinchActive = false;
+                }
                 for (const t of e.changedTouches) {
                     if (input.joyActive && t.identifier === input.joyTouchId) {
                         input.joyActive = false;
@@ -1397,7 +1388,7 @@
                         input.joyVecY = 0;
                         updateDynamicJoystickVisual(false);
                     } else if (input.camTouchId === t.identifier) {
-                        if (!input.camMoved && state.mode === 'playing') triggerJump();
+                        if (!input.camMoved && !input.pinchActive && state.mode === 'playing') triggerJump();
                         input.camTouchId = null;
                     }
                 }
@@ -1405,6 +1396,12 @@
 
             canvas.addEventListener('touchend', onTouchEnd, { passive: true });
             canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+            canvas.addEventListener('wheel', (e) => {
+                if (state.mode !== 'playing') return;
+                e.preventDefault();
+                camCtrl.distance = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, camCtrl.distance + e.deltaY * 0.008));
+            }, { passive: false });
 
             let mouseDragging = false;
             let lastMouseX = 0;
@@ -1548,19 +1545,6 @@
                 c.mesh.rotation.z += 2.6 * dt;
                 c.mesh.position.y = c.y + Math.sin(elapsed * 3.5 + c.x) * 0.2;
             }
-            for (const en of aerialEnemies) {
-                if (!en.alive) continue;
-                const t = elapsed * en.speed + en.phase;
-                const nextX = en.baseX + Math.cos(t) * en.patrolRadius;
-                const diveY = en.kind === 'eagle' ? Math.sin(t * 2) * 1.15 : Math.sin(t * 1.5) * 0.55;
-                const nextY = en.baseY + diveY;
-                const nextZ = en.baseZ + Math.sin(t) * (en.patrolRadius * 0.55);
-                en.group.lookAt(nextX, nextY, nextZ);
-                en.group.position.set(nextX, nextY, nextZ);
-                const flap = Math.sin(elapsed * 14 + en.phase) * 0.65;
-                en.leftWing.rotation.z = flap;
-                en.rightWing.rotation.z = -flap;
-            }
         }
 
         function updatePlayer(dt, elapsed) {
@@ -1654,15 +1638,6 @@
             if (player.pos.y <= lavaFloorY + 0.45) {
                 respawnPlayer(true);
                 return;
-            }
-
-            for (const en of aerialEnemies) {
-                if (!en.alive) continue;
-                const pCenter = new THREE.Vector3(player.pos.x, player.pos.y + 0.95, player.pos.z);
-                if (pCenter.distanceTo(en.group.position) < 1.35) {
-                    respawnPlayer(true);
-                    return;
-                }
             }
 
             for (const cp of checkpoints) {
