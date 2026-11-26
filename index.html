@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Obby 3D Estilo Roblox — Aventura Aérea</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         html, body {
@@ -125,7 +127,7 @@
                 </button>
             </div>
 
-            <!-- Barra central estilo Roblox (17/30) -->
+            <!-- Barra central estilo Roblox (1/30) -->
             <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto bg-indigo-950/65 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-indigo-300/35 shadow-lg">
                 <button id="btn-stage-first" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Primera etapa">«</button>
                 <button id="btn-stage-prev" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Etapa anterior">‹</button>
@@ -178,11 +180,17 @@
 
     <script>
         // ==========================================
+        // CONFIGURACIÓN DE PERSONAJE 3D (GLB / FBX)
+        // ==========================================
+        // Cambia esta ruta por la de tu modelo en GitHub (ej. './assets/personaje.glb' o './assets/personaje.fbx')
+        const CHARACTER_MODEL_URL = './assets/personaje.glb';
+        const CHARACTER_SCALE = 1.15;
+
+        // ==========================================
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 30;
         const STORAGE_KEY = 'obby_roblox_aereo_v1';
-        const CUSTOM_CHARACTER_URL = './Sara-opt.glb';
 
         const state = {
             mode: 'lobby',
@@ -438,6 +446,7 @@
 
         const player = {
             root: null,
+            fallbackGroup: null,
             leftLeg: null,
             rightLeg: null,
             leftArm: null,
@@ -448,8 +457,13 @@
             onGround: false,
             jumpsUsed: 0,
             maxJumps: 2,
-            walkCycle: 0
+            walkCycle: 0,
+            usingExternalModel: false
         };
+
+        let playerMixer = null;
+        let animIdle = null, animRun = null, animJump = null;
+        let currentAnimAction = null;
 
         const camCtrl = {
             yaw: 0,
@@ -493,7 +507,7 @@
                 tex = new THREE.CanvasTexture(canvas);
                 tex.wrapS = THREE.RepeatWrapping;
                 tex.wrapT = THREE.RepeatWrapping;
-                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.encoding = THREE.sRGBEncoding;
                 studTextureCache.set(key, tex);
             }
 
@@ -536,7 +550,7 @@
             tex.wrapS = THREE.RepeatWrapping;
             tex.wrapT = THREE.RepeatWrapping;
             tex.repeat.set(24, 24);
-            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.encoding = THREE.sRGBEncoding;
             return tex;
         }
 
@@ -679,108 +693,118 @@
             }
         }
 
+        function playPlayerAnim(action) {
+            if (!action || action === currentAnimAction) return;
+            action.reset().fadeIn(0.15).play();
+            if (currentAnimAction) currentAnimAction.fadeOut(0.15);
+            currentAnimAction = action;
+        }
+
+        function attachExternalCharacter(model, animations = []) {
+            if (!player.root || !model) return;
+            if (player.fallbackGroup) {
+                player.fallbackGroup.visible = false;
+            }
+
+            model.scale.set(CHARACTER_SCALE, CHARACTER_SCALE, CHARACTER_SCALE);
+            model.position.set(0, 0, 0);
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            player.root.add(model);
+            player.usingExternalModel = true;
+
+            if (animations && animations.length > 0) {
+                playerMixer = new THREE.AnimationMixer(model);
+                animIdle = playerMixer.clipAction(animations[0]);
+                animRun = animations[1] ? playerMixer.clipAction(animations[1]) : animIdle;
+                animJump = animations[2] ? playerMixer.clipAction(animations[2]) : animRun;
+                animIdle.play();
+                currentAnimAction = animIdle;
+            }
+        }
+
+        function loadExternalCharacterIfConfigured() {
+            if (!CHARACTER_MODEL_URL) return;
+            const isFbx = CHARACTER_MODEL_URL.toLowerCase().endsWith('.fbx');
+
+            if (isFbx && typeof THREE.FBXLoader === 'function') {
+                const fbxLoader = new THREE.FBXLoader();
+                fbxLoader.load(
+                    CHARACTER_MODEL_URL,
+                    (fbx) => attachExternalCharacter(fbx, fbx.animations || []),
+                    undefined,
+                    () => {}
+                );
+            } else if (typeof THREE.GLTFLoader === 'function') {
+                const gltfLoader = new THREE.GLTFLoader();
+                gltfLoader.load(
+                    CHARACTER_MODEL_URL,
+                    (gltf) => attachExternalCharacter(gltf.scene, gltf.animations || []),
+                    undefined,
+                    () => {}
+                );
+            }
+        }
+
         function buildRobloxPlayer() {
             const root = new THREE.Group();
+            const fallbackGroup = new THREE.Group();
 
             const shirtMat = getStuddedMaterial(0x2563eb, 0.5);
             const pantsMat = getStuddedMaterial(0x1e293b, 0.6);
             const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.45 });
             const capMat = getStuddedMaterial(0xdc2626, 0.5);
 
-            const placeholderGroup = new THREE.Group();
-
             const torso = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.62), shirtMat);
             torso.position.y = 1.65;
             torso.castShadow = true;
-            placeholderGroup.add(torso);
+            fallbackGroup.add(torso);
 
             const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), skinMat);
             head.position.y = 2.7;
             head.castShadow = true;
-            placeholderGroup.add(head);
+            fallbackGroup.add(head);
 
             const cap = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.34, 0.96), capMat);
             cap.position.set(0, 3.12, -0.04);
-            placeholderGroup.add(cap);
+            fallbackGroup.add(cap);
 
             const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
             leftLeg.position.set(-0.28, 0.52, 0);
             leftLeg.castShadow = true;
-            placeholderGroup.add(leftLeg);
+            fallbackGroup.add(leftLeg);
 
             const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
             rightLeg.position.set(0.28, 0.52, 0);
             rightLeg.castShadow = true;
-            placeholderGroup.add(rightLeg);
+            fallbackGroup.add(rightLeg);
 
             const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
             leftArm.position.set(-0.78, 1.68, 0);
             leftArm.castShadow = true;
-            placeholderGroup.add(leftArm);
+            fallbackGroup.add(leftArm);
 
             const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
             rightArm.position.set(0.78, 1.68, 0);
             rightArm.castShadow = true;
-            placeholderGroup.add(rightArm);
+            fallbackGroup.add(rightArm);
 
-            root.add(placeholderGroup);
+            root.add(fallbackGroup);
 
             player.root = root;
+            player.fallbackGroup = fallbackGroup;
             player.leftLeg = leftLeg;
             player.rightLeg = rightLeg;
             player.leftArm = leftArm;
             player.rightArm = rightArm;
             scene.add(root);
 
-            if (typeof THREE.GLTFLoader === 'function' && CUSTOM_CHARACTER_URL) {
-                const loader = new THREE.GLTFLoader();
-                loader.load(
-                    CUSTOM_CHARACTER_URL,
-                    (gltf) => {
-                        const model = gltf.scene;
-
-                        model.updateMatrixWorld(true);
-                        const box = new THREE.Box3().setFromObject(model);
-                        const size = new THREE.Vector3();
-                        box.getSize(size);
-
-                        const desiredHeight = 3.2;
-                        const scaleFactor = size.y > 0.0001 ? desiredHeight / size.y : 1;
-                        model.scale.setScalar(scaleFactor);
-
-                        model.updateMatrixWorld(true);
-                        const scaledBox = new THREE.Box3().setFromObject(model);
-                        const center = new THREE.Vector3();
-                        scaledBox.getCenter(center);
-
-                        model.position.x -= center.x;
-                        model.position.z -= center.z;
-                        model.position.y -= scaledBox.min.y;
-
-                        model.traverse((child) => {
-                            if (child.isMesh) {
-                                child.castShadow = true;
-                                child.receiveShadow = true;
-                            }
-                        });
-
-                        root.remove(placeholderGroup);
-                        root.add(model);
-
-                        player.leftLeg = null;
-                        player.rightLeg = null;
-                        player.leftArm = null;
-                        player.rightArm = null;
-
-                        showToast('¡Sara cargada en el Obby!', 1600);
-                    },
-                    undefined,
-                    (err) => {
-                        console.error('Error cargando Sara-opt.glb:', err);
-                        showToast('No se pudo cargar Sara-opt.glb; usando personaje base', 2200);
-                    }
-                );
-            }
+            loadExternalCharacterIfConfigured();
         }
 
         function initThree() {
@@ -796,14 +820,14 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.outputEncoding = THREE.sRGBEncoding;
 
             clock = new THREE.Clock();
 
-            const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.05);
+            const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 0.95);
             scene.add(hemiLight);
 
-            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.15);
+            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.05);
             dirLight.position.set(28, 45, 22);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024;
@@ -1618,7 +1642,7 @@
             }
 
             const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
-            if (player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
+            if (!player.usingExternalModel) {
                 if (player.onGround && horizSpeed > 0.6) {
                     player.walkCycle += dt * 11;
                     const swing = Math.sin(player.walkCycle) * 0.65;
@@ -1631,6 +1655,15 @@
                     player.rightLeg.rotation.x = 0;
                     player.leftArm.rotation.x = player.onGround ? 0 : -0.45;
                     player.rightArm.rotation.x = player.onGround ? 0 : -0.45;
+                }
+            } else if (playerMixer) {
+                playerMixer.update(dt);
+                if (!player.onGround && animJump) {
+                    playPlayerAnim(animJump);
+                } else if (horizSpeed > 0.6 && animRun) {
+                    playPlayerAnim(animRun);
+                } else if (animIdle) {
+                    playPlayerAnim(animIdle);
                 }
             }
 
