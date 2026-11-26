@@ -181,7 +181,7 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_floorfix_v4';
+        const STORAGE_KEY = 'obby_roblox_100_proc_anim_v5';
         const PLAYER_GLB_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture-opt.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const PLAYER_TARGET_HEIGHT = 2.4;
@@ -439,6 +439,7 @@
 
         const player = {
             root: null,
+            visualPivot: null,
             fallbackGroup: null,
             customModel: null,
             mixer: null,
@@ -453,7 +454,8 @@
             onGround: false,
             jumpsUsed: 0,
             maxJumps: 2,
-            walkCycle: 0
+            walkCycle: 0,
+            animBlend: 0
         };
 
         const camCtrl = {
@@ -921,7 +923,7 @@
             loader.load(
                 PLAYER_GLB_URL,
                 (gltf) => {
-                    if (!gltf || !gltf.scene || !player.root) return;
+                    if (!gltf || !gltf.scene || !player.visualPivot) return;
 
                     const model = gltf.scene;
                     model.traverse((child) => {
@@ -954,12 +956,12 @@
                     model.position.y -= box.min.y;
 
                     if (player.customModel) {
-                        player.root.remove(player.customModel);
+                        player.visualPivot.remove(player.customModel);
                     }
 
                     player.customModel = model;
                     player.hasCustomModel = true;
-                    player.root.add(model);
+                    player.visualPivot.add(model);
 
                     if (player.fallbackGroup) {
                         player.fallbackGroup.visible = false;
@@ -980,6 +982,7 @@
 
         function buildRobloxPlayer() {
             const root = new THREE.Group();
+            const visualPivot = new THREE.Group();
             const fallbackGroup = new THREE.Group();
 
             const shirtMat = getStuddedMaterial(0x2563eb, 0.5);
@@ -1021,9 +1024,11 @@
             rightArm.castShadow = true;
             fallbackGroup.add(rightArm);
 
-            root.add(fallbackGroup);
+            visualPivot.add(fallbackGroup);
+            root.add(visualPivot);
 
             player.root = root;
+            player.visualPivot = visualPivot;
             player.fallbackGroup = fallbackGroup;
             player.leftLeg = leftLeg;
             player.rightLeg = rightLeg;
@@ -1339,6 +1344,81 @@
         }
 
         // ==========================================
+        // ANIMACIÓN PROCEDURAL (CAMINAR, CORRER, SALTAR)
+        // ==========================================
+        function updateProceduralMovementAnimation(dt, horizSpeed) {
+            if (!player.visualPivot) return;
+
+            const isMoving = horizSpeed > 0.35;
+            const runRatio = Math.max(0, Math.min(1, (horizSpeed - 1.5) / 6.5));
+            const targetBlend = isMoving ? 1 : 0;
+            player.animBlend = THREE.MathUtils.lerp(player.animBlend, targetBlend, Math.min(1, dt * 12));
+
+            if (isMoving) {
+                const cadence = 9.5 + runRatio * 6.5;
+                player.walkCycle += dt * cadence;
+            }
+
+            const strideWave = Math.sin(player.walkCycle);
+            const bounceWave = Math.abs(Math.cos(player.walkCycle));
+
+            let targetPivotY = 0;
+            let targetPitchX = 0;
+            let targetRollZ = 0;
+
+            if (!player.onGround) {
+                // Pose dinámica de salto o caída
+                const airTilt = THREE.MathUtils.clamp(-player.vel.y * 0.014, -0.24, 0.22);
+                targetPitchX = airTilt;
+                targetPivotY = player.vel.y > 0 ? 0.14 : 0.04;
+            } else {
+                const hopHeight = (0.07 + runRatio * 0.11) * bounceWave * player.animBlend;
+                const leanForward = -(0.06 + runRatio * 0.14) * player.animBlend;
+                targetPivotY = hopHeight;
+                targetPitchX = leanForward;
+                targetRollZ = strideWave * (0.03 + runRatio * 0.04) * player.animBlend;
+            }
+
+            player.visualPivot.position.y = THREE.MathUtils.lerp(
+                player.visualPivot.position.y,
+                targetPivotY,
+                Math.min(1, dt * 16)
+            );
+            player.visualPivot.rotation.x = THREE.MathUtils.lerp(
+                player.visualPivot.rotation.x,
+                targetPitchX,
+                Math.min(1, dt * 14)
+            );
+            player.visualPivot.rotation.z = THREE.MathUtils.lerp(
+                player.visualPivot.rotation.z,
+                targetRollZ,
+                Math.min(1, dt * 14)
+            );
+
+            // Animación de extremidades en el personaje cúbico de respaldo
+            if (!player.hasCustomModel && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
+                if (!player.onGround) {
+                    player.leftLeg.rotation.x = THREE.MathUtils.lerp(player.leftLeg.rotation.x, 0.45, Math.min(1, dt * 14));
+                    player.rightLeg.rotation.x = THREE.MathUtils.lerp(player.rightLeg.rotation.x, -0.35, Math.min(1, dt * 14));
+                    player.leftArm.rotation.x = THREE.MathUtils.lerp(player.leftArm.rotation.x, -0.65, Math.min(1, dt * 14));
+                    player.rightArm.rotation.x = THREE.MathUtils.lerp(player.rightArm.rotation.x, -0.65, Math.min(1, dt * 14));
+                } else if (isMoving) {
+                    const swingAmp = 0.55 + runRatio * 0.45;
+                    const swing = strideWave * swingAmp;
+                    player.leftLeg.rotation.x = swing;
+                    player.rightLeg.rotation.x = -swing;
+                    player.leftArm.rotation.x = -swing * 0.75;
+                    player.rightArm.rotation.x = swing * 0.75;
+                } else {
+                    player.leftLeg.rotation.x = THREE.MathUtils.lerp(player.leftLeg.rotation.x, 0, Math.min(1, dt * 12));
+                    player.rightLeg.rotation.x = THREE.MathUtils.lerp(player.rightLeg.rotation.x, 0, Math.min(1, dt * 12));
+                    player.leftArm.rotation.x = THREE.MathUtils.lerp(player.leftArm.rotation.x, 0, Math.min(1, dt * 12));
+                    player.rightArm.rotation.x = THREE.MathUtils.lerp(player.rightArm.rotation.x, 0, Math.min(1, dt * 12));
+                }
+            }
+        }
+
+        // ==========================================
         // SIMULACIÓN DEL MUNDO, JUGADOR Y CÁMARA
         // ==========================================
         function updateWorld(dt, elapsed) {
@@ -1452,6 +1532,7 @@
             if (state.mode !== 'playing') {
                 player.root.position.copy(player.pos);
                 player.root.rotation.y = elapsed * 0.45;
+                updateProceduralMovementAnimation(dt, 0);
                 return;
             }
 
@@ -1591,22 +1672,8 @@
                 }
             }
 
-            if (!player.hasCustomModel && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
-                const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
-                if (player.onGround && horizSpeed > 0.6) {
-                    player.walkCycle += dt * 11;
-                    const swing = Math.sin(player.walkCycle) * 0.65;
-                    player.leftLeg.rotation.x = swing;
-                    player.rightLeg.rotation.x = -swing;
-                    player.leftArm.rotation.x = -swing * 0.7;
-                    player.rightArm.rotation.x = swing * 0.7;
-                } else {
-                    player.leftLeg.rotation.x = 0;
-                    player.rightLeg.rotation.x = 0;
-                    player.leftArm.rotation.x = player.onGround ? 0 : -0.45;
-                    player.rightArm.rotation.x = player.onGround ? 0 : -0.45;
-                }
-            }
+            const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
+            updateProceduralMovementAnimation(dt, horizSpeed);
 
             player.root.position.copy(player.pos);
         }
