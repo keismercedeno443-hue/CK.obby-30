@@ -174,7 +174,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v16';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v17';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
@@ -187,8 +187,10 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
 
+        // Posición exacta confirmada en captura para el Nivel 1
+        const LEVEL_1_FIXED_SPAWN = { x: 50.2, y: 4.6, z: -21.8 };
+        const LEVEL_1_SPAWN_FACTORS = { x: 0.56, z: -0.26 };
         const LEVEL_1_FACING_YAW = -0.65;
-        const LEVEL_1_SPAWN_FACTORS = { x: 0.0, z: 0.45 };
 
         const state = {
             mode: 'lobby',
@@ -432,8 +434,8 @@
         let mapMeshes = [];
         let mapBox = null;
         let lavaFloorY = -20;
-        let level1Spawn = new THREE.Vector3(0, 2, 0);
-        let currentSpawn = new THREE.Vector3(0, 2, 0);
+        let level1Spawn = new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z);
+        let currentSpawn = new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z);
 
         const raycaster = new THREE.Raycaster();
         const downDir = new THREE.Vector3(0, -1, 0);
@@ -459,7 +461,7 @@
             rightLeg: null,
             leftArm: null,
             rightArm: null,
-            pos: new THREE.Vector3(0, 2, 0),
+            pos: new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z),
             vel: new THREE.Vector3(0, 0, 0),
             yaw: LEVEL_1_FACING_YAW,
             onGround: false,
@@ -718,29 +720,12 @@
             const searchTopY = mapBox.max.y + 40;
             const savedSpawn = loadSavedSpawn();
 
-            let bestStart = savedSpawn;
-            if (!bestStart) {
-                const candidateCoords = [
-                    [mapBox.max.x * LEVEL_1_SPAWN_FACTORS.x, mapBox.max.z * LEVEL_1_SPAWN_FACTORS.z],
-                    [0, mapBox.max.z * 0.42],
-                    [mapBox.min.x * 0.15, mapBox.max.z * 0.42],
-                    [mapBox.max.x * 0.15, mapBox.max.z * 0.42],
-                    [0, mapBox.max.z * 0.35]
-                ];
-                for (const [cx, cz] of candidateCoords) {
-                    const sy = findSurfaceHeightAt(cx, cz, searchTopY, true);
-                    if (typeof sy === 'number' && Number.isFinite(sy)) {
-                        bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
-                        break;
-                    }
-                }
-            }
-            if (!bestStart) {
-                const center = new THREE.Vector3();
-                mapBox.getCenter(center);
-                const sy = findSurfaceHeightAt(center.x, center.z, searchTopY, true);
-                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.35 : 1.2, center.z);
-            }
+            const fixedSpawn = new THREE.Vector3(
+                LEVEL_1_FIXED_SPAWN.x,
+                LEVEL_1_FIXED_SPAWN.y,
+                LEVEL_1_FIXED_SPAWN.z
+            );
+            const bestStart = savedSpawn || fixedSpawn;
 
             level1Spawn.copy(bestStart);
             currentSpawn.copy(level1Spawn);
