@@ -191,7 +191,7 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 8.5;
+        const DRAGON_TARGET_SPAN = 9.5;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -585,8 +585,12 @@
 
         function buildDistantDuskClouds() {
             if (!environmentGroup) return;
-            while (environmentGroup.children.length > 0) {
-                environmentGroup.remove(environmentGroup.children[0]);
+            const toRemove = [];
+            environmentGroup.traverse((obj) => {
+                if (obj.userData && obj.userData.isSkyCloud) toRemove.push(obj);
+            });
+            for (const obj of toRemove) {
+                if (obj.parent) obj.parent.remove(obj);
             }
             skyClouds.length = 0;
 
@@ -602,6 +606,7 @@
 
                 const scale = 1.2 + (i % 4) * 0.38;
                 const cloud = createGreyishCloudCluster(cx, cy, cz, scale, cloudTints[i % cloudTints.length]);
+                cloud.userData.isSkyCloud = true;
                 cloud.rotation.y = -angle + Math.PI / 2;
                 environmentGroup.add(cloud);
 
@@ -659,15 +664,16 @@
                     ambientDragons.length = 0;
 
                     const configs = [
-                        { radius: 72, baseY: 34, speed: 0.14, phase: 0.0, scale: 1.05, bobAmp: 2.2 },
-                        { radius: 98, baseY: 46, speed: -0.10, phase: 2.1, scale: 1.25, bobAmp: 2.8 },
-                        { radius: 122, baseY: 28, speed: 0.085, phase: 4.2, scale: 1.15, bobAmp: 2.4 }
+                        { radius: 64, baseY: 28, speed: 0.15, phase: 0.0, scale: 1.0, bobAmp: 2.0 },
+                        { radius: 88, baseY: 38, speed: -0.11, phase: 2.1, scale: 1.2, bobAmp: 2.5 },
+                        { radius: 112, baseY: 22, speed: 0.09, phase: 4.2, scale: 1.1, bobAmp: 2.2 }
                     ];
 
                     configs.forEach((cfg, idx) => {
                         const wrapper = new THREE.Group();
+                        wrapper.userData.isAmbientDragon = true;
                         const bodyPivot = new THREE.Group();
-                        const clone = idx === 0 ? gltf.scene : THREE.SkeletonUtils ? THREE.SkeletonUtils.clone(gltf.scene) : gltf.scene.clone(true);
+                        const clone = gltf.scene.clone(true);
 
                         clone.traverse((child) => {
                             if (child.isMesh || child.isSkinnedMesh) {
@@ -685,8 +691,8 @@
                                             m.needsUpdate = true;
                                         }
                                         if (m.emissive && m.emissive.getHex() === 0x000000) {
-                                            m.emissive.setHex(0x7c2d12);
-                                            m.emissiveIntensity = 0.25;
+                                            m.emissive.setHex(0x9a3412);
+                                            m.emissiveIntensity = 0.28;
                                         }
                                         m.needsUpdate = true;
                                     });
@@ -1720,10 +1726,9 @@
                 d.angle += d.speed * dt;
                 const x = Math.cos(d.angle) * d.radius;
                 const z = Math.sin(d.angle) * d.radius;
-                const y = Math.max(18, lavaFloorY + d.baseY) + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
+                const y = Math.max(16, lavaFloorY + d.baseY) + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
 
                 d.wrapper.position.set(x, y, z);
-                // Orientar la cabeza del dragón en dirección tangente al vuelo orbital
                 const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
                 d.wrapper.rotation.y = tangentYaw;
 
