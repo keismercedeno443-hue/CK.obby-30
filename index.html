@@ -181,9 +181,8 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_proc_anim_v7';
+        const STORAGE_KEY = 'obby_roblox_100_fixed_v8';
 
-        // Rutas relativas en tu repositorio CK.obby-30
         const PLAYER_GLB_URL = './character-opt%20%281%29.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const ANIM_IDLE_GLB_URL = './Stop%20Walking.glb';
@@ -277,9 +276,7 @@
                 gain.connect(ctx.destination);
                 osc.start(now);
                 osc.stop(now + duration + 0.02);
-            } catch (err) {
-                // Ignorar errores de audio
-            }
+            } catch (err) {}
         }
 
         function sfxJump() { playTone(310, 0.14, 'square', 0.06, 620); }
@@ -448,6 +445,7 @@
             visualPivot: null,
             fallbackGroup: null,
             customModel: null,
+            baseScale: 1,
             mixer: null,
             actions: {
                 idle: null,
@@ -470,11 +468,10 @@
             animBlend: 0
         };
 
-        // Cámara más alta y alejada para ver siempre el cuerpo completo del personaje
         const camCtrl = {
             yaw: 0,
             pitch: 0.42,
-            distance: 13.5
+            distance: 13.0
         };
 
         function computeCameraDesiredPos(target) {
@@ -495,8 +492,7 @@
                     const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
                     const hits = camRay.intersectObjects(mapMeshes, true);
                     if (hits.length > 0) {
-                        // Nunca acercar menos de 5.5 unidades para no ocultar al personaje
-                        const safeDist = Math.max(5.5, hits[0].distance - 0.75);
+                        const safeDist = Math.max(6.0, hits[0].distance - 0.75);
                         desiredPos.copy(target).addScaledVector(dir, safeDist);
                     }
                 }
@@ -507,7 +503,7 @@
 
         function snapCameraToPlayer() {
             if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.2, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.1, player.pos.z);
             const desiredPos = computeCameraDesiredPos(target);
             camera.position.copy(desiredPos);
             camera.lookAt(target);
@@ -1019,40 +1015,54 @@
                     let meshCount = 0;
 
                     model.traverse((child) => {
+                        child.visible = true;
                         if (child.isMesh) {
                             meshCount += 1;
+                            child.visible = true;
                             child.castShadow = true;
                             child.receiveShadow = true;
                             child.frustumCulled = false;
+
                             if (child.material) {
-                                child.material.side = THREE.DoubleSide;
-                                if (child.material.map) {
-                                    child.material.map.encoding = THREE.sRGBEncoding;
-                                    child.material.needsUpdate = true;
-                                }
+                                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach((m) => {
+                                    m.visible = true;
+                                    m.transparent = false;
+                                    m.opacity = 1;
+                                    m.side = THREE.DoubleSide;
+                                    if (m.map) {
+                                        m.map.encoding = THREE.sRGBEncoding;
+                                        m.needsUpdate = true;
+                                    }
+                                    m.needsUpdate = true;
+                                });
                             }
                         }
                     });
 
                     if (meshCount === 0) return;
 
+                    model.position.set(0, 0, 0);
+                    model.rotation.set(0, 0, 0);
+                    model.scale.set(1, 1, 1);
                     model.updateMatrixWorld(true);
+
                     let box = new THREE.Box3().setFromObject(model);
                     const size = new THREE.Vector3();
                     box.getSize(size);
 
-                    if (size.y > 0.0001) {
-                        const scale = PLAYER_TARGET_HEIGHT / size.y;
-                        model.scale.setScalar(scale);
-                        model.updateMatrixWorld(true);
-                        box = new THREE.Box3().setFromObject(model);
-                    }
+                    const scale = size.y > 0.0001 ? PLAYER_TARGET_HEIGHT / size.y : 1;
+                    player.baseScale = scale;
+                    model.scale.setScalar(scale);
+                    model.updateMatrixWorld(true);
+                    box = new THREE.Box3().setFromObject(model);
 
                     const center = new THREE.Vector3();
                     box.getCenter(center);
-                    model.position.x -= center.x;
-                    model.position.z -= center.z;
-                    model.position.y -= box.min.y;
+                    model.position.x = -center.x;
+                    model.position.z = -center.z;
+                    model.position.y = -box.min.y;
+                    model.updateMatrixWorld(true);
 
                     if (player.customModel) {
                         player.visualPivot.remove(player.customModel);
@@ -1077,6 +1087,8 @@
                     loadExternalAnimationClip(ANIM_IDLE_GLB_URL, 'idle', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
+
+                    showToast(`Personaje GLB listo (${meshCount} mallas)`, 1600);
                 },
                 undefined,
                 (err) => {
@@ -1084,6 +1096,7 @@
                     if (player.fallbackGroup) {
                         player.fallbackGroup.visible = true;
                     }
+                    showToast('Usando personaje de respaldo', 1600);
                 }
             );
         }
@@ -1101,37 +1114,45 @@
             const torso = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.62), shirtMat);
             torso.position.y = 1.65;
             torso.castShadow = true;
+            torso.frustumCulled = false;
             fallbackGroup.add(torso);
 
             const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), skinMat);
             head.position.y = 2.7;
             head.castShadow = true;
+            head.frustumCulled = false;
             fallbackGroup.add(head);
 
             const cap = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.34, 0.96), capMat);
             cap.position.set(0, 3.12, -0.04);
+            cap.frustumCulled = false;
             fallbackGroup.add(cap);
 
             const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
             leftLeg.position.set(-0.28, 0.52, 0);
             leftLeg.castShadow = true;
+            leftLeg.frustumCulled = false;
             fallbackGroup.add(leftLeg);
 
             const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
             rightLeg.position.set(0.28, 0.52, 0);
             rightLeg.castShadow = true;
+            rightLeg.frustumCulled = false;
             fallbackGroup.add(rightLeg);
 
             const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
             leftArm.position.set(-0.78, 1.68, 0);
             leftArm.castShadow = true;
+            leftArm.frustumCulled = false;
             fallbackGroup.add(leftArm);
 
             const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
             rightArm.position.set(0.78, 1.68, 0);
             rightArm.castShadow = true;
+            rightArm.frustumCulled = false;
             fallbackGroup.add(rightArm);
 
+            fallbackGroup.visible = true;
             visualPivot.add(fallbackGroup);
             root.add(visualPivot);
 
@@ -1795,12 +1816,17 @@
             const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
             updateProceduralMovementAnimation(dt, horizSpeed);
 
+            if (player.customModel && player.baseScale) {
+                player.customModel.visible = true;
+                player.customModel.scale.setScalar(player.baseScale);
+            }
+
             player.root.position.copy(player.pos);
         }
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.2, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.1, player.pos.z);
             const desiredPos = computeCameraDesiredPos(target);
             camera.position.lerp(desiredPos, 0.16);
             camera.lookAt(target);
