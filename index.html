@@ -6,9 +6,7 @@
     <title>Obby 3D Estilo Roblox — Aventura Aérea</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         html, body {
@@ -127,7 +125,7 @@
                 </button>
             </div>
 
-            <!-- Barra central estilo Roblox (1/30) -->
+            <!-- Barra central estilo Roblox (17/30) -->
             <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto bg-indigo-950/65 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-indigo-300/35 shadow-lg">
                 <button id="btn-stage-first" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Primera etapa">«</button>
                 <button id="btn-stage-prev" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Etapa anterior">‹</button>
@@ -180,16 +178,12 @@
 
     <script>
         // ==========================================
-        // CONFIGURACIÓN DE PERSONAJE 3D (GLB / FBX)
-        // ==========================================
-        const CHARACTER_MODEL_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture.glb';
-        const CHARACTER_TARGET_HEIGHT = 2.6;
-
-        // ==========================================
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 30;
         const STORAGE_KEY = 'obby_roblox_aereo_v1';
+        const PLAYER_GLB_URL = './personaje.glb';
+        const PLAYER_TARGET_HEIGHT = 3.0;
 
         const state = {
             mode: 'lobby',
@@ -446,6 +440,9 @@
         const player = {
             root: null,
             fallbackGroup: null,
+            customModel: null,
+            mixer: null,
+            hasCustomModel: false,
             leftLeg: null,
             rightLeg: null,
             leftArm: null,
@@ -456,13 +453,8 @@
             onGround: false,
             jumpsUsed: 0,
             maxJumps: 2,
-            walkCycle: 0,
-            usingExternalModel: false
+            walkCycle: 0
         };
-
-        let playerMixer = null;
-        let animIdle = null, animRun = null, animJump = null;
-        let currentAnimAction = null;
 
         const camCtrl = {
             yaw: 0,
@@ -692,77 +684,75 @@
             }
         }
 
-        function playPlayerAnim(action) {
-            if (!action || action === currentAnimAction) return;
-            action.reset().fadeIn(0.15).play();
-            if (currentAnimAction) currentAnimAction.fadeOut(0.15);
-            currentAnimAction = action;
-        }
-
-        function attachExternalCharacter(model, animations = []) {
-            if (!player.root || !model) return;
-            if (player.fallbackGroup) {
-                player.fallbackGroup.visible = false;
+        function loadCustomPlayerGLB() {
+            if (typeof THREE.GLTFLoader !== 'function') {
+                console.warn('GLTFLoader no disponible; se mantiene el personaje base.');
+                return;
             }
 
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                PLAYER_GLB_URL,
+                (gltf) => {
+                    if (!gltf || !gltf.scene || !player.root) return;
+
+                    const model = gltf.scene;
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material && child.material.map) {
+                                child.material.map.encoding = THREE.sRGBEncoding;
+                                child.material.needsUpdate = true;
+                            }
+                        }
+                    });
+
+                    // Escala automática para que encaje con el tamaño del Obby (~3.0 unidades de alto)
+                    model.updateMatrixWorld(true);
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = new THREE.Vector3();
+                    box.getSize(size);
+
+                    if (size.y > 0.0001) {
+                        const scale = PLAYER_TARGET_HEIGHT / size.y;
+                        model.scale.setScalar(scale);
+                        model.updateMatrixWorld(true);
+                        box.setFromObject(model);
+                    }
+
+                    // Centrar en XZ y apoyar los pies exactamente en y = 0
+                    const center = new THREE.Vector3();
+                    box.getCenter(center);
+                    model.position.x -= center.x;
+                    model.position.z -= center.z;
+                    model.position.y -= box.min.y;
+
+                    if (player.customModel) {
+                        player.root.remove(player.customModel);
+                    }
+
+                    player.customModel = model;
+                    player.hasCustomModel = true;
+                    player.root.add(model);
+
+                    if (player.fallbackGroup) {
+                        player.fallbackGroup.visible = false;
+                    }
+
+                    if (Array.isArray(gltf.animations) && gltf.animations.length > 0) {
+                        player.mixer = new THREE.AnimationMixer(model);
+                        const action = player.mixer.clipAction(gltf.animations[0]);
+                        action.play();
+                    }
+
+                    showToast('¡Personaje 3D cargado!', 1400);
+                },
+                undefined,
+                (err) => {
+                    console.warn('No se pudo cargar ./personaje.glb, usando personaje base:', err);
                 }
-            });
-
-            model.updateMatrixWorld(true);
-            const box = new THREE.Box3().setFromObject(model);
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            if (size.y > 0.001) {
-                const scaleFactor = CHARACTER_TARGET_HEIGHT / size.y;
-                model.scale.multiplyScalar(scaleFactor);
-                model.updateMatrixWorld(true);
-                const scaledBox = new THREE.Box3().setFromObject(model);
-                const center = new THREE.Vector3();
-                scaledBox.getCenter(center);
-                model.position.x -= center.x;
-                model.position.z -= center.z;
-                model.position.y -= scaledBox.min.y;
-            }
-
-            player.root.add(model);
-            player.usingExternalModel = true;
-            showToast('✨ Personaje 3D cargado', 1500);
-
-            if (animations && animations.length > 0) {
-                playerMixer = new THREE.AnimationMixer(model);
-                animIdle = playerMixer.clipAction(animations[0]);
-                animRun = animations[1] ? playerMixer.clipAction(animations[1]) : animIdle;
-                animJump = animations[2] ? playerMixer.clipAction(animations[2]) : animRun;
-                animIdle.play();
-                currentAnimAction = animIdle;
-            }
-        }
-
-        function loadExternalCharacterIfConfigured() {
-            if (!CHARACTER_MODEL_URL) return;
-            const isFbx = CHARACTER_MODEL_URL.toLowerCase().endsWith('.fbx');
-
-            if (isFbx && typeof THREE.FBXLoader === 'function') {
-                const fbxLoader = new THREE.FBXLoader();
-                fbxLoader.load(
-                    CHARACTER_MODEL_URL,
-                    (fbx) => attachExternalCharacter(fbx, fbx.animations || []),
-                    undefined,
-                    () => {}
-                );
-            } else if (typeof THREE.GLTFLoader === 'function') {
-                const gltfLoader = new THREE.GLTFLoader();
-                gltfLoader.load(
-                    CHARACTER_MODEL_URL,
-                    (gltf) => attachExternalCharacter(gltf.scene, gltf.animations || []),
-                    undefined,
-                    () => {}
-                );
-            }
+            );
         }
 
         function buildRobloxPlayer() {
@@ -818,7 +808,7 @@
             player.rightArm = rightArm;
             scene.add(root);
 
-            loadExternalCharacterIfConfigured();
+            loadCustomPlayerGLB();
         }
 
         function initThree() {
@@ -1512,10 +1502,13 @@
         function updatePlayer(dt, elapsed) {
             if (!player.root) return;
 
+            if (player.mixer) {
+                player.mixer.update(dt);
+            }
+
             if (state.mode !== 'playing') {
                 player.root.position.copy(player.pos);
                 player.root.rotation.y = elapsed * 0.5;
-                if (playerMixer) playerMixer.update(dt);
                 return;
             }
 
@@ -1656,8 +1649,8 @@
                 return;
             }
 
-            const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
-            if (!player.usingExternalModel) {
+            if (!player.hasCustomModel && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
+                const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
                 if (player.onGround && horizSpeed > 0.6) {
                     player.walkCycle += dt * 11;
                     const swing = Math.sin(player.walkCycle) * 0.65;
@@ -1670,15 +1663,6 @@
                     player.rightLeg.rotation.x = 0;
                     player.leftArm.rotation.x = player.onGround ? 0 : -0.45;
                     player.rightArm.rotation.x = player.onGround ? 0 : -0.45;
-                }
-            } else if (playerMixer) {
-                playerMixer.update(dt);
-                if (!player.onGround && animJump) {
-                    playPlayerAnim(animJump);
-                } else if (horizSpeed > 0.6 && animRun) {
-                    playPlayerAnim(animRun);
-                } else if (animIdle) {
-                    playPlayerAnim(animIdle);
                 }
             }
 
