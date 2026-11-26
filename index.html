@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1e293b">
     <title>Obby 3D Estilo Roblox — Amy</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -123,6 +126,9 @@
                     <span>🗺️</span>
                     <span>Etapas</span>
                 </button>
+                <button id="btn-hud-fullscreen" class="roblox-btn bg-slate-800/85 hover:bg-slate-700 text-white px-2.5 py-2 rounded-2xl border border-white/20 text-xs font-extrabold" title="Pantalla completa">
+                    ⛶
+                </button>
             </div>
 
             <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto bg-indigo-950/65 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-indigo-300/35 shadow-lg">
@@ -149,8 +155,13 @@
         <div class="flex items-end justify-between gap-3">
             <div class="hidden sm:block pointer-events-none">
                 <span class="inline-block bg-slate-900/60 text-white/95 text-xs px-3.5 py-1 rounded-full backdrop-blur-sm">
-                    Izquierda: mover • Derecha: saltar / cámara • 2 dedos: zoom
+                    Izquierda: mover • Derecha: girar cámara / saltar • 2 dedos: zoom
                 </span>
+            </div>
+            <div class="ml-auto pointer-events-auto">
+                <button id="btn-jump" class="roblox-btn w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-amber-400/90 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm border-2 border-white/50 flex items-center justify-center shadow-xl">
+                    SALTAR
+                </button>
             </div>
         </div>
     </div>
@@ -186,6 +197,8 @@
         const LAVA_FLOOR_SPAN = 760;
         const MIN_CAM_DIST = 3.5;
         const MAX_CAM_DIST = 18.0;
+        const MIN_CAM_PITCH = -0.45;
+        const MAX_CAM_PITCH = 1.05;
 
         const LEVEL_1_FIXED_SPAWN = { x: 52.0, y: 4.6, z: -21.5 };
         const LEVEL_1_FACING_YAW = -1.89;
@@ -197,6 +210,17 @@
             coins: 0,
             soundEnabled: true
         };
+
+        function requestImmersiveFullscreen() {
+            const el = document.documentElement;
+            try {
+                if (!document.fullscreenElement && el.requestFullscreen) {
+                    el.requestFullscreen().catch(() => {});
+                } else if (!document.webkitFullscreenElement && el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                }
+            } catch (e) {}
+        }
 
         function loadState() {
             try {
@@ -459,7 +483,7 @@
                 target.y + vertDist,
                 target.z + Math.cos(camCtrl.yaw) * horizDist
             );
-            if (mapLoaded && mapMeshes.length > 0) {
+            if (mapLoaded && mapMeshes.length > 0 && camCtrl.pitch >= 0) {
                 const dir = desiredPos.clone().sub(target);
                 const maxDist = dir.length();
                 if (maxDist > 0.5) {
@@ -571,7 +595,6 @@
             const cloudTints = [0x94a3b8, 0x78716c, 0x8b95a5, 0xa1a1aa, 0x6b7280];
             const totalClouds = 28;
 
-            // Nubes medio grises en el horizonte de atardecer sin obstruir la vista del obby
             for (let i = 0; i < totalClouds; i++) {
                 const angle = (i / totalClouds) * Math.PI * 2 + (i % 3) * 0.14;
                 const radius = 148 + (i % 4) * 32;
@@ -1192,7 +1215,6 @@
         function initThree() {
             const canvas = document.getElementById('game-canvas');
             scene = new THREE.Scene();
-            // Cielo tipo atardecer volcánico opaco que combina con la lava naranja/amarilla/negra
             scene.background = new THREE.Color(0x263447);
             scene.fog = new THREE.FogExp2(0x3b3545, 0.0020);
 
@@ -1264,6 +1286,7 @@
             camLastX: 0,
             camLastY: 0,
             camMoved: false,
+            camStartTime: 0,
             pinchActive: false,
             pinchStartDist: 0,
             pinchStartCamDist: 8.2
@@ -1299,6 +1322,14 @@
             }
         }
 
+        function findTouchById(touchList, id) {
+            if (id === null || id === undefined || !touchList) return null;
+            for (let i = 0; i < touchList.length; i++) {
+                if (touchList[i].identifier === id) return touchList[i];
+            }
+            return null;
+        }
+
         function bindControls() {
             window.addEventListener('keydown', (e) => {
                 input.keys[e.code] = true;
@@ -1315,7 +1346,7 @@
             canvas.addEventListener('touchstart', (e) => {
                 if (state.mode !== 'playing') return;
 
-                if (e.touches.length === 2) {
+                if (e.touches.length >= 2) {
                     input.pinchActive = true;
                     input.pinchStartDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
                     input.pinchStartCamDist = camCtrl.distance;
@@ -1325,7 +1356,8 @@
                 }
 
                 const halfW = window.innerWidth * 0.5;
-                for (const t of e.changedTouches) {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
                     if (t.clientX < halfW && !input.joyActive) {
                         input.joyActive = true;
                         input.joyTouchId = t.identifier;
@@ -1339,6 +1371,7 @@
                         input.camLastX = t.clientX;
                         input.camLastY = t.clientY;
                         input.camMoved = false;
+                        input.camStartTime = performance.now();
                     }
                 }
             }, { passive: true });
@@ -1353,10 +1386,11 @@
                     return;
                 }
 
-                for (const t of e.changedTouches) {
-                    if (input.joyActive && t.identifier === input.joyTouchId) {
-                        let dx = t.clientX - input.joyOriginX;
-                        let dy = t.clientY - input.joyOriginY;
+                if (input.joyActive && input.joyTouchId !== null) {
+                    const jt = findTouchById(e.touches, input.joyTouchId);
+                    if (jt) {
+                        let dx = jt.clientX - input.joyOriginX;
+                        let dy = jt.clientY - input.joyOriginY;
                         const dist = Math.hypot(dx, dy);
                         if (dist > maxRadius) {
                             dx = (dx / dist) * maxRadius;
@@ -1365,14 +1399,20 @@
                         input.joyVecX = dx / maxRadius;
                         input.joyVecY = dy / maxRadius;
                         updateDynamicJoystickVisual(true, input.joyOriginX, input.joyOriginY, dx, dy);
-                    } else if (input.camTouchId === t.identifier) {
-                        const dx = t.clientX - input.camLastX;
-                        const dy = t.clientY - input.camLastY;
-                        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) input.camMoved = true;
+                    }
+                }
+
+                if (input.camTouchId !== null && !input.pinchActive) {
+                    const ct = findTouchById(e.touches, input.camTouchId);
+                    if (ct) {
+                        const dx = ct.clientX - input.camLastX;
+                        const dy = ct.clientY - input.camLastY;
+                        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) input.camMoved = true;
                         camCtrl.yaw -= dx * 0.0065;
-                        camCtrl.pitch = Math.max(0.22, Math.min(1.05, camCtrl.pitch + dy * 0.005));
-                        input.camLastX = t.clientX;
-                        input.camLastY = t.clientY;
+                        // dy < 0 es arrastrar hacia arriba -> baja pitch para mirar hacia el cielo
+                        camCtrl.pitch = Math.max(MIN_CAM_PITCH, Math.min(MAX_CAM_PITCH, camCtrl.pitch + dy * 0.0055));
+                        input.camLastX = ct.clientX;
+                        input.camLastY = ct.clientY;
                     }
                 }
             }, { passive: true });
@@ -1381,17 +1421,22 @@
                 if (e.touches.length < 2) {
                     input.pinchActive = false;
                 }
-                for (const t of e.changedTouches) {
-                    if (input.joyActive && t.identifier === input.joyTouchId) {
-                        input.joyActive = false;
-                        input.joyTouchId = null;
-                        input.joyVecX = 0;
-                        input.joyVecY = 0;
-                        updateDynamicJoystickVisual(false);
-                    } else if (input.camTouchId === t.identifier) {
-                        if (!input.camMoved && !input.pinchActive && state.mode === 'playing') triggerJump();
-                        input.camTouchId = null;
+
+                if (input.joyActive && input.joyTouchId !== null && !findTouchById(e.touches, input.joyTouchId)) {
+                    input.joyActive = false;
+                    input.joyTouchId = null;
+                    input.joyVecX = 0;
+                    input.joyVecY = 0;
+                    updateDynamicJoystickVisual(false);
+                }
+
+                if (input.camTouchId !== null && !findTouchById(e.touches, input.camTouchId)) {
+                    const elapsedTap = performance.now() - input.camStartTime;
+                    if (!input.camMoved && !input.pinchActive && elapsedTap < 320 && state.mode === 'playing') {
+                        triggerJump();
                     }
+                    input.camTouchId = null;
+                    input.camMoved = false;
                 }
             };
 
@@ -1417,7 +1462,7 @@
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
                 camCtrl.yaw -= dx * 0.0055;
-                camCtrl.pitch = Math.max(0.22, Math.min(1.05, camCtrl.pitch + dy * 0.0045));
+                camCtrl.pitch = Math.max(MIN_CAM_PITCH, Math.min(MAX_CAM_PITCH, camCtrl.pitch + dy * 0.005));
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
             });
@@ -1425,10 +1470,22 @@
 
             document.getElementById('btn-play')?.addEventListener('click', () => {
                 ensureAudioContext();
+                requestImmersiveFullscreen();
                 state.currentLevel = 1;
                 saveState();
                 teleportToStageProgress(1);
                 setMode('playing');
+            });
+            document.getElementById('btn-hud-fullscreen')?.addEventListener('click', () => {
+                requestImmersiveFullscreen();
+            });
+            document.getElementById('btn-jump')?.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                triggerJump();
+            }, { passive: true });
+            document.getElementById('btn-jump')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                triggerJump();
             });
             document.getElementById('btn-open-levels')?.addEventListener('click', openLevelsModal);
             document.getElementById('btn-close-levels')?.addEventListener('click', closeLevelsModal);
