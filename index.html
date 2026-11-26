@@ -86,7 +86,7 @@
                 Colorful 100-Stage Obby
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Salta por el mapa principal, guarda checkpoints, esquiva la lava y derriba enemigos voladores.
+                Comienza en el Nivel 1, guarda checkpoints, esquiva la lava y derriba enemigos voladores.
             </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
@@ -102,7 +102,7 @@
 
             <div class="flex flex-col gap-2.5">
                 <button id="btn-play" class="roblox-btn w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-base tracking-wide">
-                    ▶ JUGAR AHORA
+                    ▶ JUGAR NIVEL 1
                 </button>
                 <button id="btn-open-levels" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
                     🗺️ Elegir Etapa (1 - 100)
@@ -127,7 +127,7 @@
 
             <!-- Barra central estilo Roblox -->
             <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto bg-indigo-950/65 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-indigo-300/35 shadow-lg">
-                <button id="btn-stage-first" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Primera etapa">«</button>
+                <button id="btn-stage-first" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Nivel 1">«</button>
                 <button id="btn-stage-prev" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Etapa anterior">‹</button>
                 <div class="px-2.5 sm:px-3.5 py-0.5 rounded-full bg-indigo-600/90 border border-indigo-200/40 text-white font-black text-xs sm:text-sm tracking-wide">
                     <span id="hud-level-text" class="text-amber-300">1</span><span class="text-indigo-200/80">/100</span>
@@ -181,7 +181,7 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_main_v1';
+        const STORAGE_KEY = 'obby_roblox_100_lvl1_v2';
         const PLAYER_GLB_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture-opt.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const PLAYER_TARGET_HEIGHT = 2.6;
@@ -359,6 +359,7 @@
                 lobbyEl.classList.add('hidden');
                 hudEl.classList.remove('hidden');
                 hudEl.classList.add('flex');
+                snapCameraToPlayer();
                 startSuspenseMusic();
             } else {
                 lobbyEl.classList.remove('hidden');
@@ -422,7 +423,8 @@
         let mapMeshes = [];
         let mapBox = null;
         let lavaFloorY = -16;
-        let currentSpawn = new THREE.Vector3(0, 4, 0);
+        let level1Spawn = new THREE.Vector3(0, 2, 0);
+        let currentSpawn = new THREE.Vector3(0, 2, 0);
 
         const raycaster = new THREE.Raycaster();
         const downDir = new THREE.Vector3(0, -1, 0);
@@ -445,7 +447,7 @@
             rightLeg: null,
             leftArm: null,
             rightArm: null,
-            pos: new THREE.Vector3(0, 4, 0),
+            pos: new THREE.Vector3(0, 2, 0),
             vel: new THREE.Vector3(0, 0, 0),
             yaw: 0,
             onGround: false,
@@ -459,6 +461,19 @@
             pitch: 0.34,
             distance: 10.5
         };
+
+        function snapCameraToPlayer() {
+            if (!camera || !player.pos) return;
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.9, player.pos.z);
+            const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
+            const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
+            camera.position.set(
+                target.x + Math.sin(camCtrl.yaw) * horizDist,
+                target.y + vertDist,
+                target.z + Math.cos(camCtrl.yaw) * horizDist
+            );
+            camera.lookAt(target);
+        }
 
         function getStuddedMaterial(hexColor, roughness = 0.55) {
             const key = `${hexColor}_${roughness}`;
@@ -621,7 +636,7 @@
         function findSurfaceHeightAt(x, z, startY = 80) {
             if (!mapLoaded || mapMeshes.length === 0) return null;
             raycaster.set(new THREE.Vector3(x, startY, z), downDir);
-            raycaster.far = 220;
+            raycaster.far = 260;
             const hits = raycaster.intersectObjects(mapMeshes, true);
             for (const h of hits) {
                 if (h.face && h.face.normal.y > 0.35) {
@@ -640,6 +655,16 @@
             aerialEnemies.length = 0;
             playerShots.length = 0;
             enemyFireballs.length = 0;
+        }
+
+        function addLevel1StartPad(x, y, z) {
+            const pad = new THREE.Mesh(
+                new THREE.BoxGeometry(9.5, 0.7, 9.5),
+                getStuddedMaterial(0x38bdf8, 0.45)
+            );
+            pad.position.set(x, y - 0.35, z);
+            pad.receiveShadow = true;
+            entitiesGroup.add(pad);
         }
 
         function addCoin(x, y, z) {
@@ -661,7 +686,7 @@
 
         function addCheckpoint(x, y, z, stageNum) {
             const pad = new THREE.Mesh(
-                new THREE.BoxGeometry(3.0, 0.28, 3.0),
+                new THREE.BoxGeometry(3.2, 0.28, 3.2),
                 new THREE.MeshStandardMaterial({
                     color: 0x22c55e,
                     emissive: 0x15803d,
@@ -748,50 +773,54 @@
 
             const spanX = mapBox.max.x - mapBox.min.x;
             const spanZ = mapBox.max.z - mapBox.min.z;
-            const searchTopY = mapBox.max.y + 15;
+            const searchTopY = mapBox.max.y + 25;
 
-            let validStart = null;
-            const candidateOffsets = [
+            let bestStart = null;
+            const candidateCoords = [
+                [0, mapBox.max.z * 0.35],
                 [0, 0],
-                [mapBox.min.x * 0.45, mapBox.max.z * 0.45],
-                [mapBox.max.x * 0.45, mapBox.max.z * 0.45],
-                [0, mapBox.max.z * 0.4],
-                [mapBox.min.x * 0.35, mapBox.min.z * 0.35]
+                [mapBox.min.x * 0.3, mapBox.max.z * 0.3],
+                [mapBox.max.x * 0.3, mapBox.max.z * 0.3],
+                [0, mapBox.min.z * 0.25]
             ];
 
-            for (const [cx, cz] of candidateOffsets) {
+            for (const [cx, cz] of candidateCoords) {
                 const sy = findSurfaceHeightAt(cx, cz, searchTopY);
                 if (typeof sy === 'number' && Number.isFinite(sy)) {
-                    validStart = new THREE.Vector3(cx, sy + 0.6, cz);
+                    bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
                     break;
                 }
             }
 
-            if (!validStart) {
+            if (!bestStart) {
                 const center = new THREE.Vector3();
                 mapBox.getCenter(center);
                 const sy = findSurfaceHeightAt(center.x, center.z, searchTopY);
-                validStart = new THREE.Vector3(
+                bestStart = new THREE.Vector3(
                     center.x,
-                    typeof sy === 'number' ? sy + 0.6 : mapBox.max.y + 1.5,
+                    typeof sy === 'number' ? sy + 0.35 : Math.max(1.5, mapBox.max.y + 1.0),
                     center.z
                 );
             }
 
-            currentSpawn.copy(validStart);
+            addLevel1StartPad(bestStart.x, bestStart.y, bestStart.z);
+            level1Spawn.copy(bestStart);
+            currentSpawn.copy(level1Spawn);
+
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
+            snapCameraToPlayer();
 
             for (let step = 1; step <= 18; step++) {
                 const frac = step / 19;
-                const px = THREE.MathUtils.lerp(validStart.x, (Math.random() - 0.5) * spanX * 0.65, frac * 0.75);
-                const pz = THREE.MathUtils.lerp(validStart.z, mapBox.min.z * 0.72, frac);
+                const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.28), frac);
+                const pz = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.72, frac);
                 const surfY = findSurfaceHeightAt(px, pz, searchTopY);
                 if (typeof surfY === 'number') {
                     addCoin(px, surfY + 1.5, pz);
                     if (step % 3 === 0) {
-                        const stageCheckpoint = Math.min(TOTAL_LEVELS, Math.round((step / 18) * TOTAL_LEVELS));
+                        const stageCheckpoint = Math.min(TOTAL_LEVELS, Math.max(2, Math.round((step / 18) * TOTAL_LEVELS)));
                         addCheckpoint(px, surfY, pz, stageCheckpoint);
                     }
                     if (step % 4 === 0) {
@@ -804,17 +833,27 @@
 
         function teleportToStageProgress(stageNum) {
             if (!mapLoaded || !mapBox) return;
+            if (stageNum <= 1) {
+                currentSpawn.copy(level1Spawn);
+                player.pos.copy(currentSpawn);
+                player.vel.set(0, 0, 0);
+                player.jumpsUsed = 0;
+                snapCameraToPlayer();
+                return;
+            }
+
             const frac = Math.max(0, Math.min(1, (stageNum - 1) / (TOTAL_LEVELS - 1)));
             const spanX = mapBox.max.x - mapBox.min.x;
             const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.25);
-            const targetZ = THREE.MathUtils.lerp(currentSpawn.z, mapBox.min.z * 0.75, frac);
-            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 15);
-            const destY = typeof surfY === 'number' ? surfY + 0.6 : currentSpawn.y;
+            const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
+            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 25);
+            const destY = typeof surfY === 'number' ? surfY + 0.35 : level1Spawn.y;
 
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
+            snapCameraToPlayer();
         }
 
         function loadMainObbyMapGLB() {
@@ -875,7 +914,7 @@
                     mapGroup.add(model);
                     mapLoaded = true;
                     populateMapEntities();
-                    showToast('¡Mapa de 100 etapas cargado!', 1800);
+                    showToast('¡Nivel 1 listo en el mapa Obby!', 1800);
                 },
                 undefined,
                 (err) => {
@@ -1115,8 +1154,9 @@
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
+            snapCameraToPlayer();
             if (byHazard) {
-                showToast('¡Caíste en la lava! Regresaste al checkpoint', 1400);
+                showToast('¡Caíste en la lava! Regresaste al punto seguro', 1400);
             }
         }
 
@@ -1271,6 +1311,9 @@
 
             document.getElementById('btn-play')?.addEventListener('click', () => {
                 ensureAudioContext();
+                state.currentLevel = 1;
+                saveState();
+                teleportToStageProgress(1);
                 setMode('playing');
             });
             document.getElementById('btn-open-levels')?.addEventListener('click', openLevelsModal);
@@ -1479,7 +1522,21 @@
             player.pos.y = nextY;
             player.onGround = false;
 
-            if (mapLoaded && mapMeshes.length > 0 && player.vel.y <= 0) {
+            const startPadTop = level1Spawn.y;
+            if (
+                Math.abs(player.pos.x - level1Spawn.x) <= 4.75 &&
+                Math.abs(player.pos.z - level1Spawn.z) <= 4.75 &&
+                player.vel.y <= 0 &&
+                prevY >= startPadTop - 0.25 &&
+                player.pos.y <= startPadTop
+            ) {
+                player.pos.y = startPadTop;
+                player.vel.y = 0;
+                player.onGround = true;
+                player.jumpsUsed = 0;
+            }
+
+            if (!player.onGround && mapLoaded && mapMeshes.length > 0 && player.vel.y <= 0) {
                 const sampleOffsets = [
                     [0, 0],
                     [-0.32, -0.32],
