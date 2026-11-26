@@ -73,7 +73,7 @@
 
     <!-- Banner de notificación -->
     <div id="toast-banner" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200">
-        <div id="toast-text" class="bg-slate-950/90 text-amber-300 border border-amber-400/40 px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold shadow-xl"></div>
+        <div id="toast-text" class="bg-slate-950/90 text-amber-300 border border-amber-400/40 px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold shadow-xl text-center"></div>
     </div>
 
     <!-- Pantalla de Inicio / Lobby -->
@@ -180,7 +180,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v13';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v15';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
@@ -193,8 +193,8 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
 
-        // Apunta hacia el piso morado inferior (zona baja del mapa)
-        const LEVEL_1_SPAWN_FACTORS = { x: 0.0, z: 0.45 };
+        // Coordenadas exactas del piso morado del Nivel 1
+        const DEFAULT_LEVEL_1_SPAWN = { x: 49.8, y: 4.6, z: -21.3 };
 
         const state = {
             mode: 'lobby',
@@ -251,7 +251,7 @@
             } catch (e) {}
             level1Spawn.copy(v);
             currentSpawn.copy(v);
-            showToast(`Inicio Nivel 1 fijado (${v.x.toFixed(1)}, ${v.y.toFixed(1)}, ${v.z.toFixed(1)})`, 2200);
+            showToast(`Inicio Nivel 1 fijado (${v.x.toFixed(1)}, ${v.y.toFixed(1)}, ${v.z.toFixed(1)})`, 2400);
         }
 
         let audioCtx = null;
@@ -421,8 +421,8 @@
         let mapMeshes = [];
         let mapBox = null;
         let lavaFloorY = -20;
-        let level1Spawn = new THREE.Vector3(0, 2, 0);
-        let currentSpawn = new THREE.Vector3(0, 2, 0);
+        let level1Spawn = new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.y, DEFAULT_LEVEL_1_SPAWN.z);
+        let currentSpawn = new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.y, DEFAULT_LEVEL_1_SPAWN.z);
 
         const raycaster = new THREE.Raycaster();
         const downDir = new THREE.Vector3(0, -1, 0);
@@ -450,7 +450,7 @@
             rightLeg: null,
             leftArm: null,
             rightArm: null,
-            pos: new THREE.Vector3(0, 2, 0),
+            pos: new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.y, DEFAULT_LEVEL_1_SPAWN.z),
             vel: new THREE.Vector3(0, 0, 0),
             yaw: 0,
             onGround: false,
@@ -627,19 +627,12 @@
             }
         }
 
-        // Busca superficies de suelo priorizando las más bajas (para evitar caer en plataformas altas/erróneas)
-        function findSurfaceHeightAt(x, z, startY = 120, preferLowest = false) {
+        function findSurfaceHeightAt(x, z, startY = 120) {
             if (!mapLoaded || mapMeshes.length === 0) return null;
             raycaster.set(new THREE.Vector3(x, startY, z), downDir);
             raycaster.far = 350;
             const hits = raycaster.intersectObjects(mapMeshes, true);
-            if (hits.length === 0) return null;
-            if (!preferLowest) return hits[0].point.y;
-            let lowestY = hits[0].point.y;
-            for (const h of hits) {
-                if (h.point.y < lowestY) lowestY = h.point.y;
-            }
-            return lowestY;
+            return hits.length > 0 ? hits[0].point.y : null;
         }
 
         function clearEntities() {
@@ -716,26 +709,11 @@
 
             let bestStart = savedSpawn;
             if (!bestStart) {
-                const candidateCoords = [
-                    [mapBox.max.x * LEVEL_1_SPAWN_FACTORS.x, mapBox.max.z * LEVEL_1_SPAWN_FACTORS.z],
-                    [0, mapBox.max.z * 0.42],
-                    [mapBox.min.x * 0.15, mapBox.max.z * 0.42],
-                    [mapBox.max.x * 0.15, mapBox.max.z * 0.42],
-                    [0, mapBox.max.z * 0.35]
-                ];
-                for (const [cx, cz] of candidateCoords) {
-                    const sy = findSurfaceHeightAt(cx, cz, searchTopY, true);
-                    if (typeof sy === 'number' && Number.isFinite(sy)) {
-                        bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
-                        break;
-                    }
-                }
-            }
-            if (!bestStart) {
-                const center = new THREE.Vector3();
-                mapBox.getCenter(center);
-                const sy = findSurfaceHeightAt(center.x, center.z, searchTopY, true);
-                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.35 : 1.2, center.z);
+                const surfY = findSurfaceHeightAt(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.z, searchTopY);
+                const startY = typeof surfY === 'number' && Math.abs(surfY - DEFAULT_LEVEL_1_SPAWN.y) < 3.0
+                    ? surfY + 0.05
+                    : DEFAULT_LEVEL_1_SPAWN.y;
+                bestStart = new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, startY, DEFAULT_LEVEL_1_SPAWN.z);
             }
 
             level1Spawn.copy(bestStart);
@@ -751,16 +729,16 @@
                 const frac = step / 21;
                 const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.24), frac);
                 const pz = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.72, frac);
-                const surfY = findSurfaceHeightAt(px, pz, searchTopY, false);
-                if (typeof surfY === 'number') {
-                    addCoin(px, surfY + 1.2, pz);
+                const pSurfY = findSurfaceHeightAt(px, pz, searchTopY);
+                if (typeof pSurfY === 'number') {
+                    addCoin(px, pSurfY + 1.2, pz);
                     if (step % 3 === 0 && nextStageNumber <= TOTAL_LEVELS) {
-                        addCheckpoint(px, surfY, pz, nextStageNumber);
+                        addCheckpoint(px, pSurfY, pz, nextStageNumber);
                         nextStageNumber += 1;
                     }
                     if (step % 4 === 0) {
                         const kind = step % 8 === 0 ? 'dragon' : (step % 2 === 0 ? 'eagle' : 'bird');
-                        addAerialEnemy(kind, px, surfY + 4.2, pz, 5.0, 1.9);
+                        addAerialEnemy(kind, px, pSurfY + 4.2, pz, 5.0, 1.9);
                     }
                 }
             }
@@ -781,7 +759,7 @@
             const spanX = mapBox.max.x - mapBox.min.x;
             const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.22);
             const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
-            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 40, false);
+            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 40);
             const destY = typeof surfY === 'number' ? surfY + 0.35 : level1Spawn.y;
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
