@@ -155,13 +155,8 @@
         <div class="flex items-end justify-between gap-3">
             <div class="hidden sm:block pointer-events-none">
                 <span class="inline-block bg-slate-900/60 text-white/95 text-xs px-3.5 py-1 rounded-full backdrop-blur-sm">
-                    Izquierda: mover • Derecha: girar cámara / saltar • Pellizco suave: zoom
+                    Izquierda: mover • Derecha: girar cámara / toque rápido para saltar • Pellizco: zoom
                 </span>
-            </div>
-            <div class="ml-auto pointer-events-auto">
-                <button id="btn-jump" class="roblox-btn w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-amber-400/90 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm border-2 border-white/50 flex items-center justify-center shadow-xl">
-                    SALTAR
-                </button>
             </div>
         </div>
     </div>
@@ -187,6 +182,7 @@
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const LAVA_FLOOR_GLB_URL = './lava.glb';
+        const LAVA_DRAGON_GLB_URL = './lava_dragon.glb';
         const ANIM_IDLE_GLB_URL = './stop_walking.glb';
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
@@ -195,6 +191,7 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
+        const DRAGON_TARGET_SPAN = 8.5;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -446,6 +443,7 @@
         const checkpoints = [];
         const lavaSplashes = [];
         const skyClouds = [];
+        const ambientDragons = [];
         const studTextureCache = new Map();
 
         const player = {
@@ -616,6 +614,131 @@
                     phase: i * 0.9
                 });
             }
+        }
+
+        function createWingFlapParts(dragonModel) {
+            const leftWingParts = [];
+            const rightWingParts = [];
+            const box = new THREE.Box3().setFromObject(dragonModel);
+            const center = new THREE.Vector3();
+            const size = new THREE.Vector3();
+            box.getCenter(center);
+            box.getSize(size);
+
+            dragonModel.traverse((child) => {
+                const n = (child.name || '').toLowerCase();
+                if (n.includes('wing_l') || n.includes('leftwing') || n.includes('wing.l') || n.includes('ala_izq')) {
+                    leftWingParts.push(child);
+                } else if (n.includes('wing_r') || n.includes('rightwing') || n.includes('wing.r') || n.includes('ala_der')) {
+                    rightWingParts.push(child);
+                } else if (child.isMesh) {
+                    const worldPos = new THREE.Vector3();
+                    child.getWorldPosition(worldPos);
+                    const relX = worldPos.x - center.x;
+                    const relY = worldPos.y - center.y;
+                    if (Math.abs(relX) > size.x * 0.18 && relY > -size.y * 0.15) {
+                        if (relX < 0) leftWingParts.push(child);
+                        else rightWingParts.push(child);
+                    }
+                }
+            });
+
+            return { leftWingParts, rightWingParts };
+        }
+
+        function loadAmbientLavaDragons() {
+            if (typeof THREE.GLTFLoader !== 'function' || !environmentGroup) return;
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                LAVA_DRAGON_GLB_URL,
+                (gltf) => {
+                    if (!gltf || !gltf.scene) return;
+                    for (const d of ambientDragons) {
+                        if (d.wrapper) environmentGroup.remove(d.wrapper);
+                    }
+                    ambientDragons.length = 0;
+
+                    const configs = [
+                        { radius: 72, baseY: 34, speed: 0.14, phase: 0.0, scale: 1.05, bobAmp: 2.2 },
+                        { radius: 98, baseY: 46, speed: -0.10, phase: 2.1, scale: 1.25, bobAmp: 2.8 },
+                        { radius: 122, baseY: 28, speed: 0.085, phase: 4.2, scale: 1.15, bobAmp: 2.4 }
+                    ];
+
+                    configs.forEach((cfg, idx) => {
+                        const wrapper = new THREE.Group();
+                        const bodyPivot = new THREE.Group();
+                        const clone = idx === 0 ? gltf.scene : THREE.SkeletonUtils ? THREE.SkeletonUtils.clone(gltf.scene) : gltf.scene.clone(true);
+
+                        clone.traverse((child) => {
+                            if (child.isMesh || child.isSkinnedMesh) {
+                                child.visible = true;
+                                child.castShadow = false;
+                                child.receiveShadow = false;
+                                child.frustumCulled = false;
+                                if (child.material) {
+                                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                    mats.forEach((m) => {
+                                        m.visible = true;
+                                        m.side = THREE.DoubleSide;
+                                        if (m.map) {
+                                            m.map.encoding = THREE.sRGBEncoding;
+                                            m.needsUpdate = true;
+                                        }
+                                        if (m.emissive && m.emissive.getHex() === 0x000000) {
+                                            m.emissive.setHex(0x7c2d12);
+                                            m.emissiveIntensity = 0.25;
+                                        }
+                                        m.needsUpdate = true;
+                                    });
+                                }
+                            }
+                        });
+
+                        clone.updateMatrixWorld(true);
+                        const box = new THREE.Box3().setFromObject(clone);
+                        const size = new THREE.Vector3();
+                        const center = new THREE.Vector3();
+                        box.getSize(size);
+                        box.getCenter(center);
+                        const span = Math.max(size.x, size.y, size.z, 1);
+                        const normScale = (DRAGON_TARGET_SPAN * cfg.scale) / span;
+                        clone.scale.setScalar(normScale);
+                        clone.position.set(-center.x * normScale, -center.y * normScale, -center.z * normScale);
+                        clone.rotation.y = Math.PI / 2;
+
+                        bodyPivot.add(clone);
+                        wrapper.add(bodyPivot);
+                        environmentGroup.add(wrapper);
+
+                        let mixer = null;
+                        if (Array.isArray(gltf.animations) && gltf.animations.length > 0) {
+                            mixer = new THREE.AnimationMixer(clone);
+                            const action = mixer.clipAction(gltf.animations[0]);
+                            action.setLoop(THREE.LoopRepeat, Infinity);
+                            action.play();
+                        }
+
+                        const wingParts = createWingFlapParts(clone);
+                        ambientDragons.push({
+                            wrapper,
+                            bodyPivot,
+                            clone,
+                            mixer,
+                            wingParts,
+                            angle: cfg.phase,
+                            radius: cfg.radius,
+                            baseY: cfg.baseY,
+                            speed: cfg.speed,
+                            phase: cfg.phase,
+                            bobAmp: cfg.bobAmp
+                        });
+                    });
+                },
+                undefined,
+                (err) => {
+                    console.warn('No se pudo cargar lava_dragon.glb:', err);
+                }
+            );
         }
 
         function createLiquidLavaTexture() {
@@ -1248,6 +1371,7 @@
 
             buildLavaSea();
             buildDistantDuskClouds();
+            loadAmbientLavaDragons();
             initLavaSplashPool();
             buildRobloxPlayer();
             loadMainObbyMapGLB();
@@ -1366,7 +1490,6 @@
                     }
                 }
 
-                // Solo preparar pellizco cuando ambos dedos están en la mitad derecha
                 if (e.touches.length === 2 && !input.joyActive) {
                     input.pinchStartDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
                     input.pinchStartCamDist = camCtrl.distance;
@@ -1405,7 +1528,6 @@
                     }
                 }
 
-                // Pellizco controlado: solo si no se usa el joystick y hay cambio claro de distancia
                 if (!input.joyActive && e.touches.length === 2) {
                     const currentDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
                     if (!input.pinchActive && Math.abs(currentDist - input.pinchStartDist) > 22) {
@@ -1482,14 +1604,6 @@
             });
             document.getElementById('btn-hud-fullscreen')?.addEventListener('click', () => {
                 requestImmersiveFullscreen();
-            });
-            document.getElementById('btn-jump')?.addEventListener('touchstart', (e) => {
-                e.stopPropagation();
-                triggerJump();
-            }, { passive: true });
-            document.getElementById('btn-jump')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                triggerJump();
             });
             document.getElementById('btn-open-levels')?.addEventListener('click', openLevelsModal);
             document.getElementById('btn-close-levels')?.addEventListener('click', closeLevelsModal);
@@ -1601,6 +1715,33 @@
                 cl.mesh.position.y = cl.baseY + Math.sin(elapsed * 0.65 + cl.phase) * 0.55;
                 cl.mesh.rotation.y = -cl.angle + Math.PI / 2;
             }
+
+            for (const d of ambientDragons) {
+                d.angle += d.speed * dt;
+                const x = Math.cos(d.angle) * d.radius;
+                const z = Math.sin(d.angle) * d.radius;
+                const y = Math.max(18, lavaFloorY + d.baseY) + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
+
+                d.wrapper.position.set(x, y, z);
+                // Orientar la cabeza del dragón en dirección tangente al vuelo orbital
+                const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
+                d.wrapper.rotation.y = tangentYaw;
+
+                if (d.mixer) {
+                    d.mixer.update(dt);
+                } else {
+                    const flap = Math.sin(elapsed * 5.2 + d.phase);
+                    d.bodyPivot.rotation.z = flap * 0.06;
+                    d.bodyPivot.rotation.x = Math.cos(elapsed * 2.6 + d.phase) * 0.05;
+                    for (const lw of d.wingParts.leftWingParts) {
+                        lw.rotation.z = flap * 0.42;
+                    }
+                    for (const rw of d.wingParts.rightWingParts) {
+                        rw.rotation.z = -flap * 0.42;
+                    }
+                }
+            }
+
             for (const c of coins) {
                 if (c.collected) continue;
                 c.mesh.rotation.z += 2.6 * dt;
