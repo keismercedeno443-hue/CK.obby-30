@@ -176,7 +176,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v11';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v12';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -184,9 +184,13 @@
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        const USE_STOP_WALKING_GLB = true; // Ponlo en false si ves que stop_walking.glb tumba o frena a Amy
+        // Si quieres que al parar esté completamente quieta sin animaciones de bucle, mantén esto en false
+        const USE_STOP_WALKING_GLB = false;
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
+
+        // Coordenadas relativas al mapa para el inicio del Nivel 1 (ajustables si deseas mover el spawn)
+        const LEVEL_1_SPAWN_FACTORS = { x: 0, z: 0.42 };
 
         const state = {
             mode: 'lobby',
@@ -676,11 +680,12 @@
             const searchTopY = mapBox.max.y + 30;
             let bestStart = null;
             const candidateCoords = [
+                [mapBox.max.x * LEVEL_1_SPAWN_FACTORS.x, mapBox.max.z * LEVEL_1_SPAWN_FACTORS.z],
+                [0, mapBox.max.z * 0.35],
                 [0, mapBox.max.z * 0.25],
                 [0, 0],
-                [mapBox.min.x * 0.2, mapBox.max.z * 0.2],
-                [mapBox.max.x * 0.2, mapBox.max.z * 0.2],
-                [0, mapBox.min.z * 0.2]
+                [mapBox.min.x * 0.2, mapBox.max.z * 0.3],
+                [mapBox.max.x * 0.2, mapBox.max.z * 0.3]
             ];
             for (const [cx, cz] of candidateCoords) {
                 const sy = findSurfaceHeightAt(cx, cz, searchTopY);
@@ -825,7 +830,6 @@
                 const prop = track.name.slice(dotIdx);
                 const rawName = nodePath.split('|').pop().split(':').pop().toLowerCase();
 
-                // Evita que la rotación o posición del hueso raíz/cadera acueste o desplace el modelo
                 const isRootOrHips =
                     rawName === 'armature' ||
                     rawName === 'root' ||
@@ -971,12 +975,6 @@
                     }
 
                     player.mixer = new THREE.AnimationMixer(model);
-                    if (Array.isArray(gltf.animations) && gltf.animations.length > 0) {
-                        const baseClip = sanitizeAnimationClipForModel(gltf.animations[0]);
-                        player.actions.idle = player.mixer.clipAction(baseClip);
-                        player.actions.idle.play();
-                        player.activeAnimKey = 'idle';
-                    }
 
                     if (USE_STOP_WALKING_GLB) {
                         loadExternalAnimationClip(ANIM_IDLE_GLB_URL, 'idle', THREE.LoopRepeat);
@@ -984,7 +982,7 @@
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
-                    showToast(`¡Amy escala ${AMY_DIRECT_SCALE} + animaciones!`, 2000);
+                    showToast(`¡Amy escala ${AMY_DIRECT_SCALE} lista!`, 2000);
                 },
                 undefined,
                 (err) => {
@@ -1337,17 +1335,27 @@
             const isMoving = horizSpeed > 0.35;
             const runRatio = Math.max(0, Math.min(1, (horizSpeed - 1.5) / 6.5));
             const targetBlend = isMoving ? 1 : 0;
-            player.animBlend = THREE.MathUtils.lerp(player.animBlend, targetBlend, Math.min(1, dt * 12));
+            player.animBlend = THREE.MathUtils.lerp(player.animBlend, targetBlend, Math.min(1, dt * 14));
 
             if (player.hasCustomModel && player.mixer) {
                 if (!player.onGround && player.actions.jump) {
+                    player.mixer.timeScale = 1;
                     setPlayerAnimation('jump');
                 } else if (isMoving && player.actions.run) {
+                    player.mixer.timeScale = 1;
                     const runAction = player.actions.run;
                     runAction.setEffectiveTimeScale(THREE.MathUtils.clamp(0.9 + runRatio * 0.5, 0.9, 1.45));
                     setPlayerAnimation('run');
-                } else if (player.actions.idle) {
+                } else if (USE_STOP_WALKING_GLB && player.actions.idle) {
+                    player.mixer.timeScale = 1;
                     setPlayerAnimation('idle');
+                } else {
+                    // Sin animación idle activa: detiene el mixer para que los pies y cuerpo queden firmes
+                    if (player.activeAnimKey && player.actions[player.activeAnimKey]) {
+                        player.actions[player.activeAnimKey].stop();
+                        player.activeAnimKey = null;
+                    }
+                    player.mixer.timeScale = 0;
                 }
             }
 
@@ -1371,15 +1379,15 @@
                 targetPitchX = -(0.04 + runRatio * 0.08) * player.animBlend;
                 targetRollZ = strideWave * (0.025 + runRatio * 0.03) * player.animBlend;
             } else {
-                // Quieta en suelo: postura recta con leve respiración
-                targetPivotY = Math.sin(clock.getElapsedTime() * 2.5) * 0.025;
+                // Completamente quieta y firme en el suelo cuando no se mueve
+                targetPivotY = 0;
                 targetPitchX = 0;
                 targetRollZ = 0;
             }
 
-            player.visualPivot.position.y = THREE.MathUtils.lerp(player.visualPivot.position.y, targetPivotY, Math.min(1, dt * 16));
-            player.visualPivot.rotation.x = THREE.MathUtils.lerp(player.visualPivot.rotation.x, targetPitchX, Math.min(1, dt * 14));
-            player.visualPivot.rotation.z = THREE.MathUtils.lerp(player.visualPivot.rotation.z, targetRollZ, Math.min(1, dt * 14));
+            player.visualPivot.position.y = THREE.MathUtils.lerp(player.visualPivot.position.y, targetPivotY, Math.min(1, dt * 18));
+            player.visualPivot.rotation.x = THREE.MathUtils.lerp(player.visualPivot.rotation.x, targetPitchX, Math.min(1, dt * 18));
+            player.visualPivot.rotation.z = THREE.MathUtils.lerp(player.visualPivot.rotation.z, targetRollZ, Math.min(1, dt * 18));
 
             if (!player.hasCustomModel && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
                 if (!player.onGround) {
@@ -1394,10 +1402,10 @@
                     player.leftArm.rotation.x = -swing * 0.75;
                     player.rightArm.rotation.x = swing * 0.75;
                 } else {
-                    player.leftLeg.rotation.x = THREE.MathUtils.lerp(player.leftLeg.rotation.x, 0, Math.min(1, dt * 12));
-                    player.rightLeg.rotation.x = THREE.MathUtils.lerp(player.rightLeg.rotation.x, 0, Math.min(1, dt * 12));
-                    player.leftArm.rotation.x = THREE.MathUtils.lerp(player.leftArm.rotation.x, 0, Math.min(1, dt * 12));
-                    player.rightArm.rotation.x = THREE.MathUtils.lerp(player.rightArm.rotation.x, 0, Math.min(1, dt * 12));
+                    player.leftLeg.rotation.x = 0;
+                    player.rightLeg.rotation.x = 0;
+                    player.leftArm.rotation.x = 0;
+                    player.rightArm.rotation.x = 0;
                 }
             }
         }
