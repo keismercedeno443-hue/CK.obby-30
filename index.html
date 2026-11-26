@@ -181,11 +181,11 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_fixed_v3';
+        const STORAGE_KEY = 'obby_roblox_100_floorfix_v4';
         const PLAYER_GLB_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture-opt.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
-        const PLAYER_TARGET_HEIGHT = 2.6;
-        const MAP_TARGET_SPAN = 260;
+        const PLAYER_TARGET_HEIGHT = 2.4;
+        const MAP_TARGET_SPAN = 180;
 
         const state = {
             mode: 'lobby',
@@ -422,7 +422,7 @@
         let mapLoaded = false;
         let mapMeshes = [];
         let mapBox = null;
-        let lavaFloorY = -16;
+        let lavaFloorY = -20;
         let level1Spawn = new THREE.Vector3(0, 2, 0);
         let currentSpawn = new THREE.Vector3(0, 2, 0);
 
@@ -459,12 +459,12 @@
         const camCtrl = {
             yaw: 0,
             pitch: 0.34,
-            distance: 10.5
+            distance: 9.5
         };
 
         function snapCameraToPlayer() {
             if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.9, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.8, player.pos.z);
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
             const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
             camera.position.set(
@@ -633,17 +633,15 @@
             }
         }
 
-        function findSurfaceHeightAt(x, z, startY = 80) {
+        function findSurfaceHeightAt(x, z, startY = 120) {
             if (!mapLoaded || mapMeshes.length === 0) return null;
             raycaster.set(new THREE.Vector3(x, startY, z), downDir);
-            raycaster.far = 260;
+            raycaster.far = 300;
             const hits = raycaster.intersectObjects(mapMeshes, true);
-            for (const h of hits) {
-                if (h.face && Math.abs(h.face.normal.y) > 0.12) {
-                    return h.point.y;
-                }
+            if (hits.length > 0) {
+                return hits[0].point.y;
             }
-            return hits.length > 0 ? hits[0].point.y : null;
+            return null;
         }
 
         function clearEntities() {
@@ -655,16 +653,6 @@
             aerialEnemies.length = 0;
             playerShots.length = 0;
             enemyFireballs.length = 0;
-        }
-
-        function addLevel1StartPad(x, y, z) {
-            const pad = new THREE.Mesh(
-                new THREE.BoxGeometry(10.5, 0.7, 10.5),
-                getStuddedMaterial(0x38bdf8, 0.45)
-            );
-            pad.position.set(x, y - 0.35, z);
-            pad.receiveShadow = true;
-            entitiesGroup.add(pad);
         }
 
         function addCoin(x, y, z) {
@@ -686,18 +674,18 @@
 
         function addCheckpoint(x, y, z, stageNum) {
             const pad = new THREE.Mesh(
-                new THREE.BoxGeometry(3.2, 0.28, 3.2),
+                new THREE.BoxGeometry(2.8, 0.22, 2.8),
                 new THREE.MeshStandardMaterial({
                     color: 0x22c55e,
                     emissive: 0x15803d,
                     emissiveIntensity: 0.4
                 })
             );
-            pad.position.set(x, y + 0.14, z);
+            pad.position.set(x, y + 0.11, z);
             entitiesGroup.add(pad);
 
             checkpoints.push({
-                x, y: y + 0.35, z,
+                x, y: y + 0.25, z,
                 stageNum,
                 activated: false,
                 pad
@@ -772,21 +760,21 @@
             if (!mapBox) return;
 
             const spanX = mapBox.max.x - mapBox.min.x;
-            const searchTopY = mapBox.max.y + 25;
+            const searchTopY = mapBox.max.y + 30;
 
             let bestStart = null;
             const candidateCoords = [
-                [0, mapBox.max.z * 0.35],
+                [0, mapBox.max.z * 0.25],
                 [0, 0],
-                [mapBox.min.x * 0.3, mapBox.max.z * 0.3],
-                [mapBox.max.x * 0.3, mapBox.max.z * 0.3],
-                [0, mapBox.min.z * 0.25]
+                [mapBox.min.x * 0.2, mapBox.max.z * 0.2],
+                [mapBox.max.x * 0.2, mapBox.max.z * 0.2],
+                [0, mapBox.min.z * 0.2]
             ];
 
             for (const [cx, cz] of candidateCoords) {
                 const sy = findSurfaceHeightAt(cx, cz, searchTopY);
                 if (typeof sy === 'number' && Number.isFinite(sy)) {
-                    bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
+                    bestStart = new THREE.Vector3(cx, sy + 0.15, cz);
                     break;
                 }
             }
@@ -797,12 +785,11 @@
                 const sy = findSurfaceHeightAt(center.x, center.z, searchTopY);
                 bestStart = new THREE.Vector3(
                     center.x,
-                    typeof sy === 'number' ? sy + 0.35 : Math.max(1.5, mapBox.max.y + 1.0),
+                    typeof sy === 'number' ? sy + 0.15 : 1.0,
                     center.z
                 );
             }
 
-            addLevel1StartPad(bestStart.x, bestStart.y, bestStart.z);
             level1Spawn.copy(bestStart);
             currentSpawn.copy(level1Spawn);
 
@@ -811,22 +798,21 @@
             player.jumpsUsed = 0;
             snapCameraToPlayer();
 
-            // Checkpoints ordenados de forma secuencial (Etapa 2, 3, 4...)
             let nextStageNumber = 2;
-            for (let step = 1; step <= 18; step++) {
-                const frac = step / 19;
-                const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.28), frac);
+            for (let step = 1; step <= 20; step++) {
+                const frac = step / 21;
+                const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.24), frac);
                 const pz = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.72, frac);
                 const surfY = findSurfaceHeightAt(px, pz, searchTopY);
                 if (typeof surfY === 'number') {
-                    addCoin(px, surfY + 1.5, pz);
+                    addCoin(px, surfY + 1.2, pz);
                     if (step % 3 === 0 && nextStageNumber <= TOTAL_LEVELS) {
                         addCheckpoint(px, surfY, pz, nextStageNumber);
                         nextStageNumber += 1;
                     }
                     if (step % 4 === 0) {
                         const kind = step % 8 === 0 ? 'dragon' : (step % 2 === 0 ? 'eagle' : 'bird');
-                        addAerialEnemy(kind, px, surfY + 4.5, pz, 5.5, 1.9);
+                        addAerialEnemy(kind, px, surfY + 4.2, pz, 5.0, 1.9);
                     }
                 }
             }
@@ -845,10 +831,10 @@
 
             const frac = Math.max(0, Math.min(1, (stageNum - 1) / (TOTAL_LEVELS - 1)));
             const spanX = mapBox.max.x - mapBox.min.x;
-            const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.25);
+            const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.22);
             const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
-            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 25);
-            const destY = typeof surfY === 'number' ? surfY + 0.35 : level1Spawn.y;
+            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 30);
+            const destY = typeof surfY === 'number' ? surfY + 0.15 : level1Spawn.y;
 
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
@@ -910,7 +896,7 @@
                     model.updateMatrixWorld(true);
                     mapBox = new THREE.Box3().setFromObject(model);
 
-                    lavaFloorY = Math.min(-12, mapBox.min.y - 10);
+                    lavaFloorY = Math.min(-18, mapBox.min.y - 16);
                     if (lavaSeaMesh) {
                         lavaSeaMesh.position.y = lavaFloorY;
                     }
@@ -1196,7 +1182,7 @@
         function triggerJump() {
             if (state.mode !== 'playing') return;
             if (player.onGround || player.jumpsUsed < player.maxJumps) {
-                player.vel.y = player.onGround ? 12.2 : 10.8;
+                player.vel.y = player.onGround ? 12.6 : 11.2;
                 player.onGround = false;
                 player.jumpsUsed += 1;
                 sfxJump();
@@ -1490,10 +1476,10 @@
                 .addScaledVector(right, moveX)
                 .addScaledVector(forward, -moveZ);
 
-            const moveSpeed = 9.0;
+            const moveSpeed = 8.2;
             player.vel.x = wishDir.x * moveSpeed;
             player.vel.z = wishDir.z * moveSpeed;
-            player.vel.y -= 26.0 * dt;
+            player.vel.y -= 24.0 * dt;
 
             const prevY = player.pos.y;
             const nextX = player.pos.x + player.vel.x * dt;
@@ -1505,15 +1491,14 @@
                 player.yaw = targetYaw;
                 player.root.rotation.y = targetYaw;
 
-                // Solo bloquea paredes altas (> 1.15m sobre los pies) para permitir escalones y bordes
                 if (mapLoaded && mapMeshes.length > 0 && wishDir.lengthSq() > 0.01) {
                     const wallRay = new THREE.Raycaster(
-                        new THREE.Vector3(player.pos.x, player.pos.y + 1.2, player.pos.z),
+                        new THREE.Vector3(player.pos.x, player.pos.y + 1.45, player.pos.z),
                         wishDir.clone().normalize()
                     );
-                    wallRay.far = 0.55;
+                    wallRay.far = 0.45;
                     const wallHits = wallRay.intersectObjects(mapMeshes, true);
-                    const blockingWall = wallHits.find(h => Math.abs(h.face.normal.y) < 0.15);
+                    const blockingWall = wallHits.find(h => Math.abs(h.face.normal.y) < 0.08);
                     if (!blockingWall) {
                         player.pos.x = nextX;
                         player.pos.z = nextZ;
@@ -1527,40 +1512,25 @@
             player.pos.y = nextY;
             player.onGround = false;
 
-            const startPadTop = level1Spawn.y;
-            if (
-                Math.abs(player.pos.x - level1Spawn.x) <= 5.25 &&
-                Math.abs(player.pos.z - level1Spawn.z) <= 5.25 &&
-                player.vel.y <= 0 &&
-                prevY >= startPadTop - 0.35 &&
-                player.pos.y <= startPadTop + 0.08
-            ) {
-                player.pos.y = startPadTop;
-                player.vel.y = 0;
-                player.onGround = true;
-                player.jumpsUsed = 0;
-            }
-
-            // Detección de piso tolerante para evitar caer a través de mallas del .glb
-            if (!player.onGround && mapLoaded && mapMeshes.length > 0 && player.vel.y <= 1.0) {
+            if (mapLoaded && mapMeshes.length > 0 && player.vel.y <= 1.5) {
                 const sampleOffsets = [
                     [0, 0],
-                    [-0.4, -0.4],
-                    [0.4, -0.4],
-                    [-0.4, 0.4],
-                    [0.4, 0.4]
+                    [-0.45, -0.45],
+                    [0.45, -0.45],
+                    [-0.45, 0.45],
+                    [0.45, 0.45]
                 ];
                 let bestFloorY = null;
                 for (const [ox, oz] of sampleOffsets) {
-                    const rayStartY = prevY + 0.9;
+                    const rayStartY = prevY + 1.6;
                     raycaster.set(
                         new THREE.Vector3(player.pos.x + ox, rayStartY, player.pos.z + oz),
                         downDir
                     );
-                    raycaster.far = Math.max(1.25, (rayStartY - player.pos.y) + 0.55);
+                    raycaster.far = Math.max(1.8, (rayStartY - player.pos.y) + 0.8);
                     const hits = raycaster.intersectObjects(mapMeshes, true);
                     for (const h of hits) {
-                        if (h.face && Math.abs(h.face.normal.y) > 0.15 && h.point.y <= prevY + 0.75) {
+                        if (h.point.y <= prevY + 1.1) {
                             if (bestFloorY === null || h.point.y > bestFloorY) {
                                 bestFloorY = h.point.y;
                             }
@@ -1568,7 +1538,7 @@
                     }
                 }
 
-                if (bestFloorY !== null && player.pos.y <= bestFloorY + 0.15) {
+                if (bestFloorY !== null && player.pos.y <= bestFloorY + 0.25) {
                     player.pos.y = bestFloorY;
                     player.vel.y = 0;
                     player.onGround = true;
@@ -1594,7 +1564,7 @@
                 if (cp.activated) continue;
                 if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 2.8) {
                     cp.activated = true;
-                    currentSpawn.set(cp.x, cp.y + 0.35, cp.z);
+                    currentSpawn.set(cp.x, cp.y + 0.25, cp.z);
                     cp.pad.material.color.setHex(0xfacc15);
                     if (cp.stageNum > state.currentLevel) {
                         state.currentLevel = cp.stageNum;
@@ -1643,7 +1613,7 @@
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.9, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.8, player.pos.z);
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
             const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
 
