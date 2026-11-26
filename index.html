@@ -174,11 +174,12 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v17';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v19';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
+        const LAVA_FLOOR_GLB_URL = './lava_floor.glb';
         const ANIM_IDLE_GLB_URL = './stop_walking.glb';
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
@@ -187,10 +188,9 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
 
-        // Posición exacta confirmada en captura para el Nivel 1
-        const LEVEL_1_FIXED_SPAWN = { x: 50.2, y: 4.6, z: -21.8 };
-        const LEVEL_1_SPAWN_FACTORS = { x: 0.56, z: -0.26 };
-        const LEVEL_1_FACING_YAW = -0.65;
+        // Centrada sobre la plataforma morada mirando directo hacia la rampa café y el camino de colores
+        const LEVEL_1_FIXED_SPAWN = { x: 50.8, y: 4.6, z: -21.8 };
+        const LEVEL_1_FACING_YAW = -0.02;
 
         const state = {
             mode: 'lobby',
@@ -429,7 +429,7 @@
 
         let scene, camera, renderer, clock;
         let mapGroup, entitiesGroup, sceneryGroup;
-        let lavaSeaMesh, lavaSeaMat;
+        let lavaSeaMesh, lavaSeaMat, customLavaModel;
         let mapLoaded = false;
         let mapMeshes = [];
         let mapBox = null;
@@ -575,6 +575,52 @@
             return tex;
         }
 
+        function syncLavaFloorHeight() {
+            if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY;
+            if (customLavaModel) customLavaModel.position.y = lavaFloorY + 0.08;
+        }
+
+        function loadCustomLavaGLB() {
+            if (typeof THREE.GLTFLoader !== 'function' || !sceneryGroup) return;
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                LAVA_FLOOR_GLB_URL,
+                (gltf) => {
+                    if (!gltf || !gltf.scene) return;
+                    if (customLavaModel) sceneryGroup.remove(customLavaModel);
+                    const model = gltf.scene;
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.receiveShadow = true;
+                            child.frustumCulled = false;
+                            if (child.material) {
+                                child.material.side = THREE.DoubleSide;
+                                if (child.material.map) {
+                                    child.material.map.encoding = THREE.sRGBEncoding;
+                                    child.material.needsUpdate = true;
+                                }
+                            }
+                        }
+                    });
+                    model.updateMatrixWorld(true);
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = new THREE.Vector3();
+                    box.getSize(size);
+                    const span = Math.max(size.x, size.z, 1);
+                    model.scale.setScalar(720 / span);
+                    model.updateMatrixWorld(true);
+                    const scaledBox = new THREE.Box3().setFromObject(model);
+                    const center = new THREE.Vector3();
+                    scaledBox.getCenter(center);
+                    model.position.set(-center.x, lavaFloorY + 0.08 - scaledBox.min.y, -center.z);
+                    customLavaModel = model;
+                    sceneryGroup.add(customLavaModel);
+                },
+                undefined,
+                () => {}
+            );
+        }
+
         function buildLavaSea() {
             const lavaTex = createLiquidLavaTexture();
             lavaSeaMat = new THREE.MeshStandardMaterial({
@@ -590,6 +636,7 @@
             lavaSeaMesh = new THREE.Mesh(seaGeo, lavaSeaMat);
             lavaSeaMesh.position.set(0, lavaFloorY, 0);
             sceneryGroup.add(lavaSeaMesh);
+            loadCustomLavaGLB();
         }
 
         function initLavaSplashPool() {
@@ -827,7 +874,7 @@
                     model.updateMatrixWorld(true);
                     mapBox = new THREE.Box3().setFromObject(model);
                     lavaFloorY = Math.min(-18, mapBox.min.y - 16);
-                    if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY;
+                    syncLavaFloorHeight();
 
                     mapGroup.add(model);
                     mapLoaded = true;
