@@ -86,7 +86,7 @@
                 Colorful 100-Stage Obby
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Comienza en el Nivel 1, guarda checkpoints, esquiva la lava y derriba enemigos voladores.
+                Comienza en el Nivel 1, guarda checkpoints en orden, esquiva la lava y derriba enemigos voladores.
             </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
@@ -181,7 +181,7 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_lvl1_v2';
+        const STORAGE_KEY = 'obby_roblox_100_fixed_v3';
         const PLAYER_GLB_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture-opt.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const PLAYER_TARGET_HEIGHT = 2.6;
@@ -639,7 +639,7 @@
             raycaster.far = 260;
             const hits = raycaster.intersectObjects(mapMeshes, true);
             for (const h of hits) {
-                if (h.face && h.face.normal.y > 0.35) {
+                if (h.face && Math.abs(h.face.normal.y) > 0.12) {
                     return h.point.y;
                 }
             }
@@ -659,7 +659,7 @@
 
         function addLevel1StartPad(x, y, z) {
             const pad = new THREE.Mesh(
-                new THREE.BoxGeometry(9.5, 0.7, 9.5),
+                new THREE.BoxGeometry(10.5, 0.7, 10.5),
                 getStuddedMaterial(0x38bdf8, 0.45)
             );
             pad.position.set(x, y - 0.35, z);
@@ -772,7 +772,6 @@
             if (!mapBox) return;
 
             const spanX = mapBox.max.x - mapBox.min.x;
-            const spanZ = mapBox.max.z - mapBox.min.z;
             const searchTopY = mapBox.max.y + 25;
 
             let bestStart = null;
@@ -812,6 +811,8 @@
             player.jumpsUsed = 0;
             snapCameraToPlayer();
 
+            // Checkpoints ordenados de forma secuencial (Etapa 2, 3, 4...)
+            let nextStageNumber = 2;
             for (let step = 1; step <= 18; step++) {
                 const frac = step / 19;
                 const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.28), frac);
@@ -819,9 +820,9 @@
                 const surfY = findSurfaceHeightAt(px, pz, searchTopY);
                 if (typeof surfY === 'number') {
                     addCoin(px, surfY + 1.5, pz);
-                    if (step % 3 === 0) {
-                        const stageCheckpoint = Math.min(TOTAL_LEVELS, Math.max(2, Math.round((step / 18) * TOTAL_LEVELS)));
-                        addCheckpoint(px, surfY, pz, stageCheckpoint);
+                    if (step % 3 === 0 && nextStageNumber <= TOTAL_LEVELS) {
+                        addCheckpoint(px, surfY, pz, nextStageNumber);
+                        nextStageNumber += 1;
                     }
                     if (step % 4 === 0) {
                         const kind = step % 8 === 0 ? 'dragon' : (step % 2 === 0 ? 'eagle' : 'bird');
@@ -878,9 +879,12 @@
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
-                            if (child.material && child.material.map) {
-                                child.material.map.encoding = THREE.sRGBEncoding;
-                                child.material.needsUpdate = true;
+                            if (child.material) {
+                                child.material.side = THREE.DoubleSide;
+                                if (child.material.map) {
+                                    child.material.map.encoding = THREE.sRGBEncoding;
+                                    child.material.needsUpdate = true;
+                                }
                             }
                             mapMeshes.push(child);
                         }
@@ -1489,7 +1493,7 @@
             const moveSpeed = 9.0;
             player.vel.x = wishDir.x * moveSpeed;
             player.vel.z = wishDir.z * moveSpeed;
-            player.vel.y -= 27.0 * dt;
+            player.vel.y -= 26.0 * dt;
 
             const prevY = player.pos.y;
             const nextX = player.pos.x + player.vel.x * dt;
@@ -1501,14 +1505,15 @@
                 player.yaw = targetYaw;
                 player.root.rotation.y = targetYaw;
 
+                // Solo bloquea paredes altas (> 1.15m sobre los pies) para permitir escalones y bordes
                 if (mapLoaded && mapMeshes.length > 0 && wishDir.lengthSq() > 0.01) {
                     const wallRay = new THREE.Raycaster(
-                        new THREE.Vector3(player.pos.x, player.pos.y + 1.0, player.pos.z),
+                        new THREE.Vector3(player.pos.x, player.pos.y + 1.2, player.pos.z),
                         wishDir.clone().normalize()
                     );
-                    wallRay.far = 0.75;
+                    wallRay.far = 0.55;
                     const wallHits = wallRay.intersectObjects(mapMeshes, true);
-                    const blockingWall = wallHits.find(h => Math.abs(h.face.normal.y) < 0.35);
+                    const blockingWall = wallHits.find(h => Math.abs(h.face.normal.y) < 0.15);
                     if (!blockingWall) {
                         player.pos.x = nextX;
                         player.pos.z = nextZ;
@@ -1524,11 +1529,11 @@
 
             const startPadTop = level1Spawn.y;
             if (
-                Math.abs(player.pos.x - level1Spawn.x) <= 4.75 &&
-                Math.abs(player.pos.z - level1Spawn.z) <= 4.75 &&
+                Math.abs(player.pos.x - level1Spawn.x) <= 5.25 &&
+                Math.abs(player.pos.z - level1Spawn.z) <= 5.25 &&
                 player.vel.y <= 0 &&
-                prevY >= startPadTop - 0.25 &&
-                player.pos.y <= startPadTop
+                prevY >= startPadTop - 0.35 &&
+                player.pos.y <= startPadTop + 0.08
             ) {
                 player.pos.y = startPadTop;
                 player.vel.y = 0;
@@ -1536,24 +1541,26 @@
                 player.jumpsUsed = 0;
             }
 
-            if (!player.onGround && mapLoaded && mapMeshes.length > 0 && player.vel.y <= 0) {
+            // Detección de piso tolerante para evitar caer a través de mallas del .glb
+            if (!player.onGround && mapLoaded && mapMeshes.length > 0 && player.vel.y <= 1.0) {
                 const sampleOffsets = [
                     [0, 0],
-                    [-0.32, -0.32],
-                    [0.32, -0.32],
-                    [-0.32, 0.32],
-                    [0.32, 0.32]
+                    [-0.4, -0.4],
+                    [0.4, -0.4],
+                    [-0.4, 0.4],
+                    [0.4, 0.4]
                 ];
                 let bestFloorY = null;
                 for (const [ox, oz] of sampleOffsets) {
+                    const rayStartY = prevY + 0.9;
                     raycaster.set(
-                        new THREE.Vector3(player.pos.x + ox, prevY + 0.55, player.pos.z + oz),
+                        new THREE.Vector3(player.pos.x + ox, rayStartY, player.pos.z + oz),
                         downDir
                     );
-                    raycaster.far = Math.max(0.85, (prevY - player.pos.y) + 0.75);
+                    raycaster.far = Math.max(1.25, (rayStartY - player.pos.y) + 0.55);
                     const hits = raycaster.intersectObjects(mapMeshes, true);
                     for (const h of hits) {
-                        if (h.face && h.face.normal.y > 0.35 && h.point.y <= prevY + 0.35) {
+                        if (h.face && Math.abs(h.face.normal.y) > 0.15 && h.point.y <= prevY + 0.75) {
                             if (bestFloorY === null || h.point.y > bestFloorY) {
                                 bestFloorY = h.point.y;
                             }
@@ -1561,7 +1568,7 @@
                     }
                 }
 
-                if (bestFloorY !== null && player.pos.y <= bestFloorY + 0.06) {
+                if (bestFloorY !== null && player.pos.y <= bestFloorY + 0.15) {
                     player.pos.y = bestFloorY;
                     player.vel.y = 0;
                     player.onGround = true;
