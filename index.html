@@ -19,7 +19,7 @@
             user-select: none;
             -webkit-user-select: none;
             font-family: 'Inter', sans-serif;
-            background: #1d4ed8;
+            background: #1e293b;
         }
         .roblox-title {
             font-family: 'Fredoka', 'Inter', sans-serif;
@@ -77,7 +77,7 @@
     </div>
 
     <!-- Pantalla de Inicio / Lobby -->
-    <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-sky-500/75 via-blue-700/75 to-slate-950/85 backdrop-blur-sm">
+    <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-slate-800/75 via-slate-900/80 to-slate-950/90 backdrop-blur-sm">
         <div class="w-full max-w-md bg-slate-900/90 border-2 border-white/20 rounded-3xl p-6 text-white shadow-2xl text-center">
             <div class="inline-block bg-pink-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
                 PERSONAJE: AMY • OBBY 3D
@@ -86,7 +86,7 @@
                 Colorful 100-Stage Obby
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Probando a Amy en el juego. Muévete, salta y evita caer en el piso de lava.
+                Muévete, salta y evita caer en el piso de lava.
             </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
@@ -122,10 +122,6 @@
                 <button id="btn-hud-levels" class="roblox-btn bg-sky-400 hover:bg-sky-300 text-slate-950 px-3 py-2 rounded-2xl border-2 border-slate-900/20 text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
                     <span>🗺️</span>
                     <span>Etapas</span>
-                </button>
-                <button id="btn-set-spawn" class="roblox-btn bg-purple-400 hover:bg-purple-300 text-slate-950 px-2.5 py-2 rounded-2xl border-2 border-slate-900/20 text-xs font-extrabold flex items-center gap-1" title="Guardar posición actual como inicio Nivel 1">
-                    <span>📍</span>
-                    <span>Fijar Inicio</span>
                 </button>
             </div>
 
@@ -184,7 +180,6 @@
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        // Activa o desactiva el uso de ./stop_walking.glb como animación idle
         const USE_STOP_WALKING_GLB = true;
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
@@ -249,26 +244,6 @@
                 player.root.rotation.y = yawAngle;
             }
             snapCameraToPlayer();
-        }
-
-        function saveCurrentPlayerAsLevel1Spawn() {
-            if (!player.pos) return;
-            const v = new THREE.Vector3(player.pos.x, player.pos.y + 0.1, player.pos.z);
-            try {
-                localStorage.setItem(CUSTOM_SPAWN_KEY, JSON.stringify({ x: v.x, y: v.y, z: v.z }));
-            } catch (e) {}
-            level1Spawn.copy(v);
-            currentSpawn.copy(v);
-
-            let factorMsg = '';
-            if (mapBox) {
-                const halfX = Math.max(1, Math.abs(mapBox.max.x));
-                const halfZ = Math.max(1, Math.abs(mapBox.max.z));
-                const fx = (v.x / halfX).toFixed(2);
-                const fz = (v.z / halfZ).toFixed(2);
-                factorMsg = ` | fx:${fx}, fz:${fz}`;
-            }
-            showToast(`Pos (${v.x.toFixed(1)}, ${v.y.toFixed(1)}, ${v.z.toFixed(1)})${factorMsg}`, 3500);
         }
 
         let audioCtx = null;
@@ -446,7 +421,7 @@
         const coins = [];
         const checkpoints = [];
         const lavaSplashes = [];
-        const skyBlocks = [];
+        const skyClouds = [];
         const studTextureCache = new Map();
 
         const player = {
@@ -547,44 +522,75 @@
             return mat;
         }
 
-        function buildDistantSkyBlocks() {
+        function createGreyishCloudCluster(x, y, z, scale = 1, tintHex = 0x94a3b8) {
+            const cloud = new THREE.Group();
+            const mainMat = new THREE.MeshStandardMaterial({
+                color: tintHex,
+                emissive: 0x475569,
+                emissiveIntensity: 0.18,
+                roughness: 0.92,
+                metalness: 0.04,
+                transparent: true,
+                opacity: 0.84,
+                flatShading: true
+            });
+            const underMat = new THREE.MeshStandardMaterial({
+                color: 0x64748b,
+                emissive: 0x9a3412,
+                emissiveIntensity: 0.14,
+                roughness: 0.95,
+                transparent: true,
+                opacity: 0.86,
+                flatShading: true
+            });
+
+            const puffs = [
+                { px: 0, py: 0.2, pz: 0, sx: 11.5, sy: 2.8, sz: 6.2, mat: mainMat },
+                { px: -5.2, py: -0.2, pz: 0.8, sx: 7.4, sy: 2.2, sz: 5.0, mat: mainMat },
+                { px: 5.6, py: -0.1, pz: -0.6, sx: 7.8, sy: 2.4, sz: 5.2, mat: mainMat },
+                { px: 0.4, py: -1.1, pz: 0.2, sx: 13.0, sy: 1.4, sz: 6.8, mat: underMat }
+            ];
+            for (const p of puffs) {
+                const part = new THREE.Mesh(new THREE.BoxGeometry(p.sx, p.sy, p.sz), p.mat);
+                part.position.set(p.px, p.py, p.pz);
+                cloud.add(part);
+            }
+
+            cloud.position.set(x, y, z);
+            cloud.scale.setScalar(scale);
+            return cloud;
+        }
+
+        function buildDistantDuskClouds() {
             if (!environmentGroup) return;
             while (environmentGroup.children.length > 0) {
                 environmentGroup.remove(environmentGroup.children[0]);
             }
-            skyBlocks.length = 0;
+            skyClouds.length = 0;
 
-            const blockColors = [0x60a5fa, 0x38bdf8, 0x93c5fd, 0x7dd3fc, 0x818cf8];
-            const totalBlocks = 34;
+            const cloudTints = [0x94a3b8, 0x78716c, 0x8b95a5, 0xa1a1aa, 0x6b7280];
+            const totalClouds = 28;
 
-            // Bloques flotantes pequeños y lejanos en el cielo para dar profundidad sin tapar nada
-            for (let i = 0; i < totalBlocks; i++) {
-                const angle = (i / totalBlocks) * Math.PI * 2 + (i % 3) * 0.12;
-                const radius = 155 + (i % 5) * 34;
-                const bx = Math.cos(angle) * radius;
-                const bz = Math.sin(angle) * radius;
-                const by = Math.max(10, lavaFloorY + 14 + (i % 6) * 9);
+            // Nubes medio grises en el horizonte de atardecer sin obstruir la vista del obby
+            for (let i = 0; i < totalClouds; i++) {
+                const angle = (i / totalClouds) * Math.PI * 2 + (i % 3) * 0.14;
+                const radius = 148 + (i % 4) * 32;
+                const cx = Math.cos(angle) * radius;
+                const cz = Math.sin(angle) * radius;
+                const cy = Math.max(14, lavaFloorY + 18 + (i % 5) * 9);
 
-                const size = 4.5 + (i % 4) * 2.2;
-                const mat = new THREE.MeshStandardMaterial({
-                    color: blockColors[i % blockColors.length],
-                    roughness: 0.55,
-                    metalness: 0.05,
-                    transparent: true,
-                    opacity: 0.72
-                });
-                const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size * 0.75, size), mat);
-                mesh.position.set(bx, by, bz);
-                mesh.rotation.set((i % 3) * 0.2, angle, (i % 4) * 0.15);
-                environmentGroup.add(mesh);
+                const scale = 1.2 + (i % 4) * 0.38;
+                const cloud = createGreyishCloudCluster(cx, cy, cz, scale, cloudTints[i % cloudTints.length]);
+                cloud.rotation.y = -angle + Math.PI / 2;
+                environmentGroup.add(cloud);
 
-                skyBlocks.push({
-                    mesh,
+                skyClouds.push({
+                    mesh: cloud,
                     angle,
                     radius,
-                    baseY: by,
-                    speed: 0.012 + (i % 4) * 0.004,
-                    phase: i * 0.85
+                    baseY: cy,
+                    speed: 0.010 + (i % 3) * 0.004,
+                    phase: i * 0.9
                 });
             }
         }
@@ -623,7 +629,7 @@
         function syncLavaFloorHeight() {
             if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY - 0.35;
             if (customLavaModel) customLavaModel.position.y = lavaFloorY + customLavaOffsetY;
-            buildDistantSkyBlocks();
+            buildDistantDuskClouds();
         }
 
         function loadCustomLavaGLB() {
@@ -678,12 +684,10 @@
                     model.position.set(-center.x, lavaFloorY + customLavaOffsetY, -center.z);
                     customLavaModel = model;
                     sceneryGroup.add(customLavaModel);
-                    showToast('Piso de lava (lava.glb) cargado', 1800);
                 },
                 undefined,
                 (err) => {
                     console.warn('No se pudo cargar lava.glb:', err);
-                    showToast('Error al cargar lava.glb (revisa el archivo en el repo)', 2600);
                 }
             );
         }
@@ -1017,7 +1021,6 @@
 
         function loadAmyPlayerGLB() {
             if (typeof THREE.GLTFLoader !== 'function') return;
-            showToast('Cargando a Amy...', 1500);
 
             const loader = new THREE.GLTFLoader();
             loader.load(
@@ -1103,8 +1106,6 @@
                     }
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
-
-                    showToast(`¡Amy escala ${AMY_DIRECT_SCALE} lista!`, 2000);
                 },
                 undefined,
                 (err) => {
@@ -1114,7 +1115,6 @@
                         player.fallbackGroup.traverse(c => { c.visible = true; });
                         player.fallbackGroup.scale.setScalar(AMY_DIRECT_SCALE);
                     }
-                    showToast('No se encontró Amy.glb, usando respaldo', 2000);
                 }
             );
         }
@@ -1192,8 +1192,9 @@
         function initThree() {
             const canvas = document.getElementById('game-canvas');
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x38bdf8);
-            scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0016);
+            // Cielo tipo atardecer volcánico opaco que combina con la lava naranja/amarilla/negra
+            scene.background = new THREE.Color(0x263447);
+            scene.fog = new THREE.FogExp2(0x3b3545, 0.0020);
 
             camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 900);
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -1205,17 +1206,17 @@
 
             clock = new THREE.Clock();
 
-            scene.add(new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.1));
-            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.25);
+            scene.add(new THREE.HemisphereLight(0xfdba74, 0x1e293b, 0.95));
+            const dirLight = new THREE.DirectionalLight(0xffedd5, 1.15);
             dirLight.position.set(45, 90, 35);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024;
             dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
-            const fillLight = new THREE.DirectionalLight(0xfce7f3, 0.65);
-            fillLight.position.set(-20, 25, 30);
-            scene.add(fillLight);
+            const lavaBounceLight = new THREE.DirectionalLight(0xfb923c, 0.55);
+            lavaBounceLight.position.set(-25, -18, 25);
+            scene.add(lavaBounceLight);
 
             environmentGroup = new THREE.Group();
             sceneryGroup = new THREE.Group();
@@ -1224,7 +1225,7 @@
             scene.add(environmentGroup, sceneryGroup, mapGroup, entitiesGroup);
 
             buildLavaSea();
-            buildDistantSkyBlocks();
+            buildDistantDuskClouds();
             initLavaSplashPool();
             buildRobloxPlayer();
             loadMainObbyMapGLB();
@@ -1433,7 +1434,6 @@
             document.getElementById('btn-close-levels')?.addEventListener('click', closeLevelsModal);
             document.getElementById('btn-hud-lobby')?.addEventListener('click', () => setMode('lobby'));
             document.getElementById('btn-hud-levels')?.addEventListener('click', openLevelsModal);
-            document.getElementById('btn-set-spawn')?.addEventListener('click', saveCurrentPlayerAsLevel1Spawn);
 
             const jumpToStage = (targetLvl) => {
                 const clamped = Math.max(1, Math.min(state.maxUnlockedLevel, targetLvl));
@@ -1533,12 +1533,12 @@
         }
 
         function updateWorld(dt, elapsed) {
-            for (const sb of skyBlocks) {
-                sb.angle += sb.speed * dt;
-                sb.mesh.position.x = Math.cos(sb.angle) * sb.radius;
-                sb.mesh.position.z = Math.sin(sb.angle) * sb.radius;
-                sb.mesh.position.y = sb.baseY + Math.sin(elapsed * 0.75 + sb.phase) * 0.65;
-                sb.mesh.rotation.y += 0.12 * dt;
+            for (const cl of skyClouds) {
+                cl.angle += cl.speed * dt;
+                cl.mesh.position.x = Math.cos(cl.angle) * cl.radius;
+                cl.mesh.position.z = Math.sin(cl.angle) * cl.radius;
+                cl.mesh.position.y = cl.baseY + Math.sin(elapsed * 0.65 + cl.phase) * 0.55;
+                cl.mesh.rotation.y = -cl.angle + Math.PI / 2;
             }
             for (const c of coins) {
                 if (c.collected) continue;
