@@ -86,7 +86,7 @@
                 Colorful 100-Stage Obby
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Probando a Amy en el juego. Muévete, salta y verifica que se vea y responda bien.
+                Probando a Amy en el juego. Muévete, salta y evita caer en el piso de lava.
             </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
@@ -179,7 +179,7 @@
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
-        const LAVA_FLOOR_GLB_URL = './lava_floor.glb';
+        const LAVA_FLOOR_GLB_URL = './lava.glb';
         const ANIM_IDLE_GLB_URL = './stop_walking.glb';
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
@@ -188,6 +188,7 @@
         const USE_STOP_WALKING_GLB = true;
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
+        const LAVA_FLOOR_SPAN = 760;
 
         const LEVEL_1_FIXED_SPAWN = { x: 52.0, y: 4.6, z: -21.5 };
         const LEVEL_1_FACING_YAW = -1.89;
@@ -429,11 +430,11 @@
 
         let scene, camera, renderer, clock;
         let mapGroup, entitiesGroup, sceneryGroup;
-        let lavaSeaMesh, lavaSeaMat, customLavaModel;
+        let lavaSeaMesh, lavaSeaMat, customLavaModel, customLavaOffsetY = 0;
         let mapLoaded = false;
         let mapMeshes = [];
         let mapBox = null;
-        let lavaFloorY = -20;
+        let lavaFloorY = -5.5;
         let level1Spawn = new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z);
         let currentSpawn = new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z);
 
@@ -576,8 +577,8 @@
         }
 
         function syncLavaFloorHeight() {
-            if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY;
-            if (customLavaModel) customLavaModel.position.y = lavaFloorY + 0.08;
+            if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY - 0.15;
+            if (customLavaModel) customLavaModel.position.y = lavaFloorY + customLavaOffsetY;
         }
 
         function loadCustomLavaGLB() {
@@ -594,11 +595,22 @@
                             child.receiveShadow = true;
                             child.frustumCulled = false;
                             if (child.material) {
-                                child.material.side = THREE.DoubleSide;
-                                if (child.material.map) {
-                                    child.material.map.encoding = THREE.sRGBEncoding;
-                                    child.material.needsUpdate = true;
-                                }
+                                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach((m) => {
+                                    m.side = THREE.DoubleSide;
+                                    if (m.emissive && m.emissive.getHex() === 0x000000) {
+                                        m.emissive.setHex(0xea580c);
+                                        m.emissiveIntensity = Math.max(m.emissiveIntensity || 0, 0.45);
+                                    }
+                                    if (m.map) {
+                                        m.map.encoding = THREE.sRGBEncoding;
+                                        m.needsUpdate = true;
+                                    }
+                                    if (m.emissiveMap) {
+                                        m.emissiveMap.encoding = THREE.sRGBEncoding;
+                                        m.needsUpdate = true;
+                                    }
+                                });
                             }
                         }
                     });
@@ -607,17 +619,21 @@
                     const size = new THREE.Vector3();
                     box.getSize(size);
                     const span = Math.max(size.x, size.z, 1);
-                    model.scale.setScalar(720 / span);
+                    model.scale.setScalar(LAVA_FLOOR_SPAN / span);
                     model.updateMatrixWorld(true);
                     const scaledBox = new THREE.Box3().setFromObject(model);
                     const center = new THREE.Vector3();
                     scaledBox.getCenter(center);
-                    model.position.set(-center.x, lavaFloorY + 0.08 - scaledBox.min.y, -center.z);
+                    customLavaOffsetY = -scaledBox.max.y;
+                    model.position.set(-center.x, lavaFloorY + customLavaOffsetY, -center.z);
                     customLavaModel = model;
                     sceneryGroup.add(customLavaModel);
+                    showToast('Piso de lava (lava.glb) cargado', 1600);
                 },
                 undefined,
-                () => {}
+                (err) => {
+                    console.warn('No se pudo cargar lava.glb:', err);
+                }
             );
         }
 
@@ -631,10 +647,10 @@
                 roughness: 0.2,
                 metalness: 0.1
             });
-            const seaGeo = new THREE.PlaneGeometry(750, 750, 24, 24);
+            const seaGeo = new THREE.PlaneGeometry(LAVA_FLOOR_SPAN, LAVA_FLOOR_SPAN, 24, 24);
             seaGeo.rotateX(-Math.PI / 2);
             lavaSeaMesh = new THREE.Mesh(seaGeo, lavaSeaMat);
-            lavaSeaMesh.position.set(0, lavaFloorY, 0);
+            lavaSeaMesh.position.set(0, lavaFloorY - 0.15, 0);
             sceneryGroup.add(lavaSeaMesh);
             loadCustomLavaGLB();
         }
@@ -665,6 +681,23 @@
             if (lavaSeaMat && lavaSeaMat.map) {
                 lavaSeaMat.map.offset.x += dt * 0.055;
                 lavaSeaMat.map.offset.y += dt * 0.04;
+            }
+            if (customLavaModel) {
+                customLavaModel.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        mats.forEach((m) => {
+                            if (m.map) {
+                                m.map.offset.x += dt * 0.035;
+                                m.map.offset.y += dt * 0.025;
+                            }
+                            if (m.emissiveMap) {
+                                m.emissiveMap.offset.x += dt * 0.035;
+                                m.emissiveMap.offset.y += dt * 0.025;
+                            }
+                        });
+                    }
+                });
             }
             if (Math.random() < dt * 20 && player.pos) {
                 spawnLavaSplashDroplet(
@@ -873,7 +906,8 @@
 
                     model.updateMatrixWorld(true);
                     mapBox = new THREE.Box3().setFromObject(model);
-                    lavaFloorY = Math.min(-18, mapBox.min.y - 16);
+                    // Coloca el piso de lava visible justo debajo de la base del mapa
+                    lavaFloorY = Math.max(-10, mapBox.min.y - 4.5);
                     syncLavaFloorHeight();
 
                     mapGroup.add(model);
