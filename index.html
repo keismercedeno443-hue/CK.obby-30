@@ -176,7 +176,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v2';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v4';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -184,7 +184,7 @@
         const ANIM_RUN_GLB_URL = './Running%20%281%29%20%281%29.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        const PLAYER_TARGET_HEIGHT = 2.4;
+        const PLAYER_TARGET_HEIGHT = 2.2;
         const MAP_TARGET_SPAN = 180;
 
         const state = {
@@ -427,7 +427,7 @@
             animBlend: 0
         };
 
-        const camCtrl = { yaw: 0, pitch: 0.48, distance: 15.5 };
+        const camCtrl = { yaw: 0, pitch: 0.36, distance: 14.0 };
 
         function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
@@ -455,7 +455,7 @@
 
         function snapCameraToPlayer() {
             if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.35, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.5, player.pos.z);
             camera.position.copy(computeCameraDesiredPos(target));
             camera.lookAt(target);
         }
@@ -683,7 +683,7 @@
             for (const [cx, cz] of candidateCoords) {
                 const sy = findSurfaceHeightAt(cx, cz, searchTopY);
                 if (typeof sy === 'number' && Number.isFinite(sy)) {
-                    bestStart = new THREE.Vector3(cx, sy + 0.25, cz);
+                    bestStart = new THREE.Vector3(cx, sy + 0.2, cz);
                     break;
                 }
             }
@@ -691,7 +691,7 @@
                 const center = new THREE.Vector3();
                 mapBox.getCenter(center);
                 const sy = findSurfaceHeightAt(center.x, center.z, searchTopY);
-                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.25 : 1.2, center.z);
+                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.2 : 1.0, center.z);
             }
 
             level1Spawn.copy(bestStart);
@@ -738,7 +738,7 @@
             const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.22);
             const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
             const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 30);
-            const destY = typeof surfY === 'number' ? surfY + 0.25 : level1Spawn.y;
+            const destY = typeof surfY === 'number' ? surfY + 0.2 : level1Spawn.y;
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
@@ -906,7 +906,7 @@
                     if (meshCount === 0) return;
 
                     model.position.set(0, 0, 0);
-                    model.rotation.set(0, 0, 0);
+                    model.rotation.set(0, Math.PI, 0);
                     model.scale.set(1, 1, 1);
                     model.updateMatrixWorld(true);
 
@@ -914,7 +914,8 @@
                     const size = new THREE.Vector3();
                     box.getSize(size);
 
-                    const scale = size.y > 0.0001 ? PLAYER_TARGET_HEIGHT / size.y : 1;
+                    const refHeight = Math.max(size.y, size.x * 0.8, 0.001);
+                    const scale = PLAYER_TARGET_HEIGHT / refHeight;
                     player.baseScale = scale;
                     model.scale.setScalar(scale);
                     model.updateMatrixWorld(true);
@@ -946,7 +947,7 @@
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
-                    showToast(`¡Amy lista en el juego! (${meshCount} mallas)`, 2000);
+                    showToast(`¡Amy ajustada al tamaño del juego!`, 2000);
                 },
                 undefined,
                 (err) => {
@@ -1049,7 +1050,7 @@
             dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
-            const fillLight = new THREE.DirectionalLight(0xfce7f3, 0.55);
+            const fillLight = new THREE.DirectionalLight(0xfce7f3, 0.65);
             fillLight.position.set(-20, 25, 30);
             scene.add(fillLight);
 
@@ -1444,6 +1445,8 @@
 
         function updatePlayer(dt, elapsed) {
             if (!player.root) return;
+            player.root.visible = true;
+            if (player.visualPivot) player.visualPivot.visible = true;
             if (player.mixer) player.mixer.update(dt);
 
             if (state.mode !== 'playing') {
@@ -1581,7 +1584,7 @@
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.35, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.5, player.pos.z);
             camera.position.lerp(computeCameraDesiredPos(target), 0.16);
             camera.lookAt(target);
         }
