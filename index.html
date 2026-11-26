@@ -180,8 +180,8 @@
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
-        const ANIM_IDLE_GLB_URL = './Stop%20Walking.glb';
-        const ANIM_RUN_GLB_URL = './Running%20%281%29%20%281%29.glb';
+        const ANIM_IDLE_GLB_URL = './stop_walking.glb';
+        const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
         const AMY_DIRECT_SCALE = 1.40;
@@ -814,7 +814,6 @@
             const cloned = clip.clone();
             const validTracks = [];
             for (const track of cloned.tracks) {
-                // Evita que la animación mueva la raíz en X/Z o escale inesperadamente el personaje
                 if (track.name.endsWith('.scale')) continue;
                 const dotIdx = track.name.indexOf('.');
                 if (dotIdx === -1) {
@@ -864,11 +863,11 @@
             );
         }
 
-        function setPlayerAnimation(nextKey) {
+        function setPlayerAnimation(nextKey, forceRestart = false) {
             if (!player.mixer || !player.hasCustomModel) return;
             const nextAction = player.actions[nextKey];
             if (!nextAction) return;
-            if (player.activeAnimKey === nextKey && nextAction.isRunning()) return;
+            if (!forceRestart && player.activeAnimKey === nextKey && nextAction.isRunning()) return;
             const prevAction = player.activeAnimKey ? player.actions[player.activeAnimKey] : null;
             nextAction.reset();
             nextAction.setEffectiveTimeScale(1);
@@ -1180,6 +1179,7 @@
                 player.vel.y = player.onGround ? 12.6 : 11.2;
                 player.onGround = false;
                 player.jumpsUsed += 1;
+                setPlayerAnimation('jump', true);
                 sfxJump();
             }
         }
