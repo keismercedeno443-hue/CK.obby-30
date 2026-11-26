@@ -176,7 +176,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v8';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v9';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -184,7 +184,7 @@
         const ANIM_RUN_GLB_URL = './Running%20%281%29%20%281%29.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        const AMY_DIRECT_SCALE = 0.14;
+        const AMY_DIRECT_SCALE = 0.45;
         const MAP_TARGET_SPAN = 180;
 
         const state = {
@@ -427,7 +427,7 @@
             animBlend: 0
         };
 
-        const camCtrl = { yaw: 0, pitch: 0.28, distance: 10.5 };
+        const camCtrl = { yaw: 0, pitch: 0.24, distance: 9.0 };
 
         function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
@@ -445,7 +445,7 @@
                     const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
                     const hits = camRay.intersectObjects(mapMeshes, true);
                     if (hits.length > 0) {
-                        const safeDist = Math.max(7.0, hits[0].distance - 0.85);
+                        const safeDist = Math.max(7.5, hits[0].distance - 0.85);
                         desiredPos.copy(target).addScaledVector(dir, safeDist);
                     }
                 }
@@ -455,7 +455,7 @@
 
         function snapCameraToPlayer() {
             if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.0, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.35, player.pos.z);
             camera.position.copy(computeCameraDesiredPos(target));
             camera.lookAt(target);
         }
@@ -933,12 +933,15 @@
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
-                    showToast(`¡Amy visible con escala ${AMY_DIRECT_SCALE}!`, 2000);
+                    showToast(`¡Amy tamaño normal (${AMY_DIRECT_SCALE})!`, 2000);
                 },
                 undefined,
                 (err) => {
                     console.warn('No se pudo cargar Amy.glb:', err);
-                    if (player.fallbackGroup) player.fallbackGroup.visible = true;
+                    if (player.fallbackGroup) {
+                        player.fallbackGroup.visible = true;
+                        player.fallbackGroup.scale.setScalar(AMY_DIRECT_SCALE);
+                    }
                     showToast('No se encontró Amy.glb, usando respaldo', 2000);
                 }
             );
@@ -996,6 +999,7 @@
             fallbackGroup.add(rightArm);
 
             fallbackGroup.visible = true;
+            fallbackGroup.scale.setScalar(AMY_DIRECT_SCALE);
             visualPivot.add(fallbackGroup);
             root.add(visualPivot);
 
@@ -1565,13 +1569,16 @@
                 player.customModel.visible = true;
                 player.customModel.scale.setScalar(AMY_DIRECT_SCALE);
                 if (player.fallbackGroup) player.fallbackGroup.visible = false;
+            } else if (player.fallbackGroup) {
+                player.fallbackGroup.visible = true;
+                player.fallbackGroup.scale.setScalar(AMY_DIRECT_SCALE);
             }
             player.root.position.copy(player.pos);
         }
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.0, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.35, player.pos.z);
             camera.position.lerp(computeCameraDesiredPos(target), 0.16);
             camera.lookAt(target);
         }
