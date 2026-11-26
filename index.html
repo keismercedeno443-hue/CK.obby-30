@@ -176,7 +176,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v6';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v7';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -184,8 +184,8 @@
         const ANIM_RUN_GLB_URL = './Running%20%281%29%20%281%29.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        // Escala fija directa para modelos exportados en centímetros (ajusta este número si hace falta)
-        const AMY_DIRECT_SCALE = 0.015;
+        // Escala intermedia para que Amy se vea bien en pantalla sin ser gigante ni microscópica
+        const AMY_DIRECT_SCALE = 0.08;
         const MAP_TARGET_SPAN = 180;
 
         const state = {
@@ -428,7 +428,7 @@
             animBlend: 0
         };
 
-        const camCtrl = { yaw: 0, pitch: 0.35, distance: 15.5 };
+        const camCtrl = { yaw: 0, pitch: 0.34, distance: 11.5 };
 
         function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
@@ -446,7 +446,7 @@
                     const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
                     const hits = camRay.intersectObjects(mapMeshes, true);
                     if (hits.length > 0) {
-                        const safeDist = Math.max(9.0, hits[0].distance - 0.85);
+                        const safeDist = Math.max(7.5, hits[0].distance - 0.85);
                         desiredPos.copy(target).addScaledVector(dir, safeDist);
                     }
                 }
@@ -456,7 +456,7 @@
 
         function snapCameraToPlayer() {
             if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.4, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.2, player.pos.z);
             camera.position.copy(computeCameraDesiredPos(target));
             camera.lookAt(target);
         }
@@ -684,7 +684,7 @@
             for (const [cx, cz] of candidateCoords) {
                 const sy = findSurfaceHeightAt(cx, cz, searchTopY);
                 if (typeof sy === 'number' && Number.isFinite(sy)) {
-                    bestStart = new THREE.Vector3(cx, sy + 0.2, cz);
+                    bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
                     break;
                 }
             }
@@ -692,7 +692,7 @@
                 const center = new THREE.Vector3();
                 mapBox.getCenter(center);
                 const sy = findSurfaceHeightAt(center.x, center.z, searchTopY);
-                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.2 : 1.0, center.z);
+                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.35 : 1.2, center.z);
             }
 
             level1Spawn.copy(bestStart);
@@ -739,7 +739,7 @@
             const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.22);
             const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
             const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 30);
-            const destY = typeof surfY === 'number' ? surfY + 0.2 : level1Spawn.y;
+            const destY = typeof surfY === 'number' ? surfY + 0.35 : level1Spawn.y;
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
@@ -1568,7 +1568,7 @@
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.4, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.2, player.pos.z);
             camera.position.lerp(computeCameraDesiredPos(target), 0.16);
             camera.lookAt(target);
         }
