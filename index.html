@@ -429,7 +429,7 @@
         }
 
         let scene, camera, renderer, clock;
-        let mapGroup, entitiesGroup, sceneryGroup;
+        let mapGroup, entitiesGroup, sceneryGroup, environmentGroup;
         let lavaSeaMesh, lavaSeaMat, customLavaModel, customLavaOffsetY = 0;
         let mapLoaded = false;
         let mapMeshes = [];
@@ -445,6 +445,7 @@
         const checkpoints = [];
         const lavaSplashes = [];
         const aerialEnemies = [];
+        const floatingClouds = [];
         const studTextureCache = new Map();
 
         const player = {
@@ -545,6 +546,130 @@
             return mat;
         }
 
+        function createStylizedPineTree(scale = 1, foliageColor = 0x15803d) {
+            const tree = new THREE.Group();
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.85 });
+            const foliageMat = new THREE.MeshStandardMaterial({ color: foliageColor, roughness: 0.65, flatShading: true });
+
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.65, 3.2, 7), trunkMat);
+            trunk.position.y = 1.6;
+            tree.add(trunk);
+
+            const tiers = [
+                { r: 2.8, h: 4.2, y: 4.4 },
+                { r: 2.2, h: 3.8, y: 7.0 },
+                { r: 1.5, h: 3.2, y: 9.4 }
+            ];
+            for (const t of tiers) {
+                const cone = new THREE.Mesh(new THREE.ConeGeometry(t.r, t.h, 7), foliageMat);
+                cone.position.y = t.y;
+                tree.add(cone);
+            }
+
+            tree.scale.setScalar(scale);
+            return tree;
+        }
+
+        function createHorizonIsland(x, y, z, radiusX, radiusZ, height, colorHex) {
+            const island = new THREE.Group();
+            const topMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.7, flatShading: true });
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85, flatShading: true });
+
+            const topMesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusX * 0.92, radiusX, 1.4, 8), topMat);
+            topMesh.position.y = 0;
+            island.add(topMesh);
+
+            const baseMesh = new THREE.Mesh(new THREE.ConeGeometry(radiusX * 0.95, height, 8), rockMat);
+            baseMesh.rotation.x = Math.PI;
+            baseMesh.position.y = -(height * 0.5 + 0.7);
+            island.add(baseMesh);
+
+            island.position.set(x, y, z);
+            island.scale.z = radiusZ / Math.max(1, radiusX);
+            return island;
+        }
+
+        function createCloudCluster(x, y, z, scale = 1) {
+            const cloud = new THREE.Group();
+            const cloudMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9, flatShading: true });
+            const puffs = [
+                { px: 0, py: 0, pz: 0, sx: 4.5, sy: 1.6, sz: 2.8 },
+                { px: -2.2, py: -0.2, pz: 0.3, sx: 2.8, sy: 1.2, sz: 2.2 },
+                { px: 2.3, py: -0.1, pz: -0.2, sx: 3.0, sy: 1.3, sz: 2.3 }
+            ];
+            for (const p of puffs) {
+                const part = new THREE.Mesh(new THREE.BoxGeometry(p.sx, p.sy, p.sz), cloudMat);
+                part.position.set(p.px, p.py, p.pz);
+                cloud.add(part);
+            }
+            cloud.position.set(x, y, z);
+            cloud.scale.setScalar(scale);
+            return cloud;
+        }
+
+        function buildSurroundingLandscape() {
+            if (!environmentGroup) return;
+            while (environmentGroup.children.length > 0) {
+                environmentGroup.remove(environmentGroup.children[0]);
+            }
+            floatingClouds.length = 0;
+
+            const baseY = lavaFloorY;
+            const ringRadius = 155;
+            const treeCount = 72;
+            const greenPalette = [0x15803d, 0x16a34a, 0x0d9488, 0x14532d];
+
+            // Anillo de bosque estilizado y colinas de fondo para evitar horizonte vacío
+            for (let i = 0; i < treeCount; i++) {
+                const angle = (i / treeCount) * Math.PI * 2;
+                const jitterR = ringRadius + Math.sin(i * 3.7) * 18;
+                const tx = Math.cos(angle) * jitterR;
+                const tz = Math.sin(angle) * jitterR;
+                const treeScale = 1.65 + (i % 5) * 0.45;
+                const color = greenPalette[i % greenPalette.length];
+                const tree = createStylizedPineTree(treeScale, color);
+                tree.position.set(tx, baseY - 0.3, tz);
+                tree.rotation.y = angle + (i % 3) * 0.4;
+                environmentGroup.add(tree);
+
+                if (i % 6 === 0) {
+                    const hillR = 16 + (i % 4) * 5;
+                    const hill = createHorizonIsland(
+                        Math.cos(angle) * (jitterR + 12),
+                        baseY + 0.8,
+                        Math.sin(angle) * (jitterR + 12),
+                        hillR,
+                        hillR * 0.75,
+                        14,
+                        i % 12 === 0 ? 0x16a34a : 0x0f766e
+                    );
+                    environmentGroup.add(hill);
+                }
+            }
+
+            // Nubes decorativas en el cielo alrededor del obby
+            const cloudCount = 18;
+            for (let c = 0; c < cloudCount; c++) {
+                const angle = (c / cloudCount) * Math.PI * 2 + 0.2;
+                const dist = 105 + (c % 4) * 28;
+                const cx = Math.cos(angle) * dist;
+                const cz = Math.sin(angle) * dist;
+                const cy = Math.max(24, baseY + 34 + (c % 5) * 7);
+                const scale = 1.4 + (c % 3) * 0.55;
+                const cloud = createCloudCluster(cx, cy, cz, scale);
+                cloud.rotation.y = -angle + Math.PI / 2;
+                environmentGroup.add(cloud);
+                floatingClouds.push({
+                    mesh: cloud,
+                    angle,
+                    dist,
+                    baseY: cy,
+                    speed: 0.015 + (c % 3) * 0.006,
+                    bobPhase: c * 0.9
+                });
+            }
+        }
+
         function createLiquidLavaTexture() {
             const canvas = document.createElement('canvas');
             canvas.width = 256;
@@ -579,6 +704,7 @@
         function syncLavaFloorHeight() {
             if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY - 0.35;
             if (customLavaModel) customLavaModel.position.y = lavaFloorY + customLavaOffsetY;
+            buildSurroundingLandscape();
         }
 
         function loadCustomLavaGLB() {
@@ -657,7 +783,6 @@
             seaGeo.rotateX(-Math.PI / 2);
             lavaSeaMesh = new THREE.Mesh(seaGeo, lavaSeaMat);
             lavaSeaMesh.position.set(0, lavaFloorY - 0.35, 0);
-            // Oculto temporalmente para comprobar únicamente el modelo lava.glb
             lavaSeaMesh.visible = false;
             sceneryGroup.add(lavaSeaMesh);
             loadCustomLavaGLB();
@@ -914,7 +1039,6 @@
 
                     model.updateMatrixWorld(true);
                     mapBox = new THREE.Box3().setFromObject(model);
-                    // Coloca el piso de lava visible justo debajo de la base del mapa
                     lavaFloorY = Math.max(-10, mapBox.min.y - 4.5);
                     syncLavaFloorHeight();
 
@@ -1188,7 +1312,7 @@
             const canvas = document.getElementById('game-canvas');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x38bdf8);
-            scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0022);
+            scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0014);
 
             camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 900);
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -1212,12 +1336,14 @@
             fillLight.position.set(-20, 25, 30);
             scene.add(fillLight);
 
+            environmentGroup = new THREE.Group();
             sceneryGroup = new THREE.Group();
             mapGroup = new THREE.Group();
             entitiesGroup = new THREE.Group();
-            scene.add(sceneryGroup, mapGroup, entitiesGroup);
+            scene.add(environmentGroup, sceneryGroup, mapGroup, entitiesGroup);
 
             buildLavaSea();
+            buildSurroundingLandscape();
             initLavaSplashPool();
             buildRobloxPlayer();
             loadMainObbyMapGLB();
@@ -1492,6 +1618,13 @@
         }
 
         function updateWorld(dt, elapsed) {
+            for (const cl of floatingClouds) {
+                cl.angle += cl.speed * dt;
+                cl.mesh.position.x = Math.cos(cl.angle) * cl.dist;
+                cl.mesh.position.z = Math.sin(cl.angle) * cl.dist;
+                cl.mesh.position.y = cl.baseY + Math.sin(elapsed * 0.8 + cl.bobPhase) * 0.7;
+                cl.mesh.rotation.y = -cl.angle + Math.PI / 2;
+            }
             for (const c of coins) {
                 if (c.collected) continue;
                 c.mesh.rotation.z += 2.6 * dt;
