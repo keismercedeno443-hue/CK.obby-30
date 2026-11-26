@@ -176,7 +176,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v10';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v11';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -184,7 +184,7 @@
         const ANIM_RUN_GLB_URL = './Running%20%281%29%20%281%29.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        const AMY_DIRECT_SCALE = 1.15;
+        const AMY_DIRECT_SCALE = 1.30;
         const MAP_TARGET_SPAN = 180;
 
         const state = {
@@ -413,6 +413,7 @@
             actions: { idle: null, run: null, jump: null },
             activeAnimKey: null,
             hasCustomModel: false,
+            boneNames: new Set(),
             leftLeg: null,
             rightLeg: null,
             leftArm: null,
@@ -808,6 +809,36 @@
             );
         }
 
+        function sanitizeAnimationClipForModel(clip) {
+            if (!clip || !Array.isArray(clip.tracks)) return clip;
+            const cloned = clip.clone();
+            const validTracks = [];
+            for (const track of cloned.tracks) {
+                // Evita que la animación mueva la raíz en X/Z o escale inesperadamente el personaje
+                if (track.name.endsWith('.scale')) continue;
+                const dotIdx = track.name.indexOf('.');
+                if (dotIdx === -1) {
+                    validTracks.push(track);
+                    continue;
+                }
+                const nodePath = track.name.slice(0, dotIdx);
+                const prop = track.name.slice(dotIdx);
+                const rawName = nodePath.split('|').pop().split(':').pop();
+                if (player.boneNames.size === 0 || player.boneNames.has(rawName) || player.boneNames.has(nodePath)) {
+                    if (prop === '.position' && (rawName.toLowerCase().includes('hips') || rawName.toLowerCase().includes('root'))) {
+                        continue;
+                    }
+                    validTracks.push(track);
+                }
+            }
+            if (validTracks.length > 0) {
+                cloned.tracks = validTracks;
+                cloned.resetDuration();
+                return cloned;
+            }
+            return clip;
+        }
+
         function loadExternalAnimationClip(url, key, loopMode = THREE.LoopRepeat) {
             if (!player.mixer || typeof THREE.GLTFLoader !== 'function') return;
             const loader = new THREE.GLTFLoader();
@@ -816,11 +847,14 @@
                 (gltf) => {
                     if (!gltf || !Array.isArray(gltf.animations) || gltf.animations.length === 0) return;
                     try {
-                        const action = player.mixer.clipAction(gltf.animations[0]);
+                        const cleanClip = sanitizeAnimationClipForModel(gltf.animations[0]);
+                        const action = player.mixer.clipAction(cleanClip);
                         action.setLoop(loopMode, Infinity);
                         if (loopMode === THREE.LoopOnce) action.clampWhenFinished = true;
                         player.actions[key] = action;
-                        if (key === 'idle' && !player.activeAnimKey) setPlayerAnimation('idle');
+                        if (key === 'idle' && !player.activeAnimKey) {
+                            setPlayerAnimation('idle');
+                        }
                     } catch (err) {
                         console.warn(`No se pudo enlazar animación ${key}:`, err);
                     }
@@ -841,7 +875,7 @@
             nextAction.setEffectiveWeight(1);
             nextAction.play();
             if (prevAction && prevAction !== nextAction) {
-                prevAction.crossFadeTo(nextAction, 0.16, true);
+                prevAction.crossFadeTo(nextAction, 0.14, true);
             }
             player.activeAnimKey = nextKey;
         }
@@ -858,6 +892,7 @@
 
                     const model = gltf.scene;
                     let meshCount = 0;
+                    player.boneNames.clear();
 
                     const amyFallbackMat = new THREE.MeshStandardMaterial({
                         color: 0xf472b6,
@@ -870,6 +905,10 @@
 
                     model.traverse((child) => {
                         child.visible = true;
+                        if (child.name) {
+                            player.boneNames.add(child.name);
+                            player.boneNames.add(child.name.split('|').pop().split(':').pop());
+                        }
                         if (child.isMesh || child.isSkinnedMesh) {
                             meshCount += 1;
                             child.visible = true;
@@ -924,7 +963,8 @@
 
                     player.mixer = new THREE.AnimationMixer(model);
                     if (Array.isArray(gltf.animations) && gltf.animations.length > 0) {
-                        player.actions.idle = player.mixer.clipAction(gltf.animations[0]);
+                        const baseClip = sanitizeAnimationClipForModel(gltf.animations[0]);
+                        player.actions.idle = player.mixer.clipAction(baseClip);
                         player.actions.idle.play();
                         player.activeAnimKey = 'idle';
                     }
@@ -933,7 +973,7 @@
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
-                    showToast(`¡Amy cargada (${AMY_DIRECT_SCALE})!`, 2000);
+                    showToast(`¡Amy escala ${AMY_DIRECT_SCALE} + animaciones!`, 2000);
                 },
                 undefined,
                 (err) => {
@@ -1292,7 +1332,7 @@
                     setPlayerAnimation('jump');
                 } else if (isMoving && player.actions.run) {
                     const runAction = player.actions.run;
-                    runAction.setEffectiveTimeScale(THREE.MathUtils.clamp(0.85 + runRatio * 0.55, 0.85, 1.45));
+                    runAction.setEffectiveTimeScale(THREE.MathUtils.clamp(0.9 + runRatio * 0.5, 0.9, 1.45));
                     setPlayerAnimation('run');
                 } else if (player.actions.idle) {
                     setPlayerAnimation('idle');
