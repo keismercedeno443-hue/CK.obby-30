@@ -181,9 +181,9 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_proc_anim_v6';
+        const STORAGE_KEY = 'obby_roblox_100_proc_anim_v7';
 
-        // Rutas relativas en tu repositorio CK.obby-30 (codificadas para espacios y paréntesis)
+        // Rutas relativas en tu repositorio CK.obby-30
         const PLAYER_GLB_URL = './character-opt%20%281%29.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const ANIM_IDLE_GLB_URL = './Stop%20Walking.glb';
@@ -470,22 +470,46 @@
             animBlend: 0
         };
 
+        // Cámara más alta y alejada para ver siempre el cuerpo completo del personaje
         const camCtrl = {
             yaw: 0,
-            pitch: 0.34,
-            distance: 9.5
+            pitch: 0.42,
+            distance: 13.5
         };
 
-        function snapCameraToPlayer() {
-            if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.8, player.pos.z);
+        function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
             const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
-            camera.position.set(
+
+            const desiredPos = new THREE.Vector3(
                 target.x + Math.sin(camCtrl.yaw) * horizDist,
                 target.y + vertDist,
                 target.z + Math.cos(camCtrl.yaw) * horizDist
             );
+
+            if (mapLoaded && mapMeshes.length > 0) {
+                const dir = desiredPos.clone().sub(target);
+                const maxDist = dir.length();
+                if (maxDist > 0.5) {
+                    dir.normalize();
+                    const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
+                    const hits = camRay.intersectObjects(mapMeshes, true);
+                    if (hits.length > 0) {
+                        // Nunca acercar menos de 5.5 unidades para no ocultar al personaje
+                        const safeDist = Math.max(5.5, hits[0].distance - 0.75);
+                        desiredPos.copy(target).addScaledVector(dir, safeDist);
+                    }
+                }
+            }
+
+            return desiredPos;
+        }
+
+        function snapCameraToPlayer() {
+            if (!camera || !player.pos) return;
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.2, player.pos.z);
+            const desiredPos = computeCameraDesiredPos(target);
+            camera.position.copy(desiredPos);
             camera.lookAt(target);
         }
 
@@ -810,6 +834,9 @@
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
+            if (player.root) {
+                player.root.position.copy(player.pos);
+            }
             snapCameraToPlayer();
 
             let nextStageNumber = 2;
@@ -839,6 +866,7 @@
                 player.pos.copy(currentSpawn);
                 player.vel.set(0, 0, 0);
                 player.jumpsUsed = 0;
+                if (player.root) player.root.position.copy(player.pos);
                 snapCameraToPlayer();
                 return;
             }
@@ -854,6 +882,7 @@
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
+            if (player.root) player.root.position.copy(player.pos);
             snapCameraToPlayer();
         }
 
@@ -987,19 +1016,28 @@
                     if (!gltf || !gltf.scene || !player.visualPivot) return;
 
                     const model = gltf.scene;
+                    let meshCount = 0;
+
                     model.traverse((child) => {
                         if (child.isMesh) {
+                            meshCount += 1;
                             child.castShadow = true;
                             child.receiveShadow = true;
-                            if (child.material && child.material.map) {
-                                child.material.map.encoding = THREE.sRGBEncoding;
-                                child.material.needsUpdate = true;
+                            child.frustumCulled = false;
+                            if (child.material) {
+                                child.material.side = THREE.DoubleSide;
+                                if (child.material.map) {
+                                    child.material.map.encoding = THREE.sRGBEncoding;
+                                    child.material.needsUpdate = true;
+                                }
                             }
                         }
                     });
 
+                    if (meshCount === 0) return;
+
                     model.updateMatrixWorld(true);
-                    const box = new THREE.Box3().setFromObject(model);
+                    let box = new THREE.Box3().setFromObject(model);
                     const size = new THREE.Vector3();
                     box.getSize(size);
 
@@ -1007,7 +1045,7 @@
                         const scale = PLAYER_TARGET_HEIGHT / size.y;
                         model.scale.setScalar(scale);
                         model.updateMatrixWorld(true);
-                        box.setFromObject(model);
+                        box = new THREE.Box3().setFromObject(model);
                     }
 
                     const center = new THREE.Vector3();
@@ -1042,7 +1080,10 @@
                 },
                 undefined,
                 (err) => {
-                    console.warn('No se pudo cargar personaje GLB:', err);
+                    console.warn('No se pudo cargar personaje GLB, se mantiene respaldo:', err);
+                    if (player.fallbackGroup) {
+                        player.fallbackGroup.visible = true;
+                    }
                 }
             );
         }
@@ -1101,6 +1142,7 @@
             player.rightLeg = rightLeg;
             player.leftArm = leftArm;
             player.rightArm = rightArm;
+            root.position.copy(player.pos);
             scene.add(root);
 
             loadCustomPlayerGLB();
@@ -1216,6 +1258,7 @@
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
+            if (player.root) player.root.position.copy(player.pos);
             snapCameraToPlayer();
             if (byHazard) {
                 showToast('¡Caíste en la lava! Regresaste al punto seguro', 1400);
@@ -1323,7 +1366,7 @@
                             input.camMoved = true;
                         }
                         camCtrl.yaw -= dx * 0.0065;
-                        camCtrl.pitch = Math.max(0.12, Math.min(1.05, camCtrl.pitch + dy * 0.005));
+                        camCtrl.pitch = Math.max(0.2, Math.min(1.05, camCtrl.pitch + dy * 0.005));
                         input.camLastX = t.clientX;
                         input.camLastY = t.clientY;
                     }
@@ -1363,7 +1406,7 @@
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
                 camCtrl.yaw -= dx * 0.0055;
-                camCtrl.pitch = Math.max(0.12, Math.min(1.05, camCtrl.pitch + dy * 0.0045));
+                camCtrl.pitch = Math.max(0.2, Math.min(1.05, camCtrl.pitch + dy * 0.0045));
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
             });
@@ -1757,17 +1800,9 @@
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.8, player.pos.z);
-            const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
-            const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
-
-            const desiredPos = new THREE.Vector3(
-                target.x + Math.sin(camCtrl.yaw) * horizDist,
-                target.y + vertDist,
-                target.z + Math.cos(camCtrl.yaw) * horizDist
-            );
-
-            camera.position.lerp(desiredPos, 0.14);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.2, player.pos.z);
+            const desiredPos = computeCameraDesiredPos(target);
+            camera.position.lerp(desiredPos, 0.16);
             camera.lookAt(target);
         }
 
