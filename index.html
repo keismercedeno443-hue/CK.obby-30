@@ -182,9 +182,8 @@
         // ==========================================
         // CONFIGURACIÓN DE PERSONAJE 3D (GLB / FBX)
         // ==========================================
-        // Cambia esta ruta por la de tu modelo en GitHub (ej. './assets/personaje.glb' o './assets/personaje.fbx')
-        const CHARACTER_MODEL_URL = './assets/personaje.glb';
-        const CHARACTER_SCALE = 1.15;
+        const CHARACTER_MODEL_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture.glb';
+        const CHARACTER_TARGET_HEIGHT = 2.6;
 
         // ==========================================
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
@@ -706,8 +705,6 @@
                 player.fallbackGroup.visible = false;
             }
 
-            model.scale.set(CHARACTER_SCALE, CHARACTER_SCALE, CHARACTER_SCALE);
-            model.position.set(0, 0, 0);
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
@@ -715,8 +712,25 @@
                 }
             });
 
+            model.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(model);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            if (size.y > 0.001) {
+                const scaleFactor = CHARACTER_TARGET_HEIGHT / size.y;
+                model.scale.multiplyScalar(scaleFactor);
+                model.updateMatrixWorld(true);
+                const scaledBox = new THREE.Box3().setFromObject(model);
+                const center = new THREE.Vector3();
+                scaledBox.getCenter(center);
+                model.position.x -= center.x;
+                model.position.z -= center.z;
+                model.position.y -= scaledBox.min.y;
+            }
+
             player.root.add(model);
             player.usingExternalModel = true;
+            showToast('✨ Personaje 3D cargado', 1500);
 
             if (animations && animations.length > 0) {
                 playerMixer = new THREE.AnimationMixer(model);
@@ -1501,6 +1515,7 @@
             if (state.mode !== 'playing') {
                 player.root.position.copy(player.pos);
                 player.root.rotation.y = elapsed * 0.5;
+                if (playerMixer) playerMixer.update(dt);
                 return;
             }
 
