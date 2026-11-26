@@ -181,9 +181,15 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_proc_anim_v5';
-        const PLAYER_GLB_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture-opt.glb';
+        const STORAGE_KEY = 'obby_roblox_100_proc_anim_v6';
+
+        // Rutas relativas en tu repositorio CK.obby-30 (codificadas para espacios y paréntesis)
+        const PLAYER_GLB_URL = './character-opt%20%281%29.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
+        const ANIM_IDLE_GLB_URL = './Stop%20Walking.glb';
+        const ANIM_RUN_GLB_URL = './Running%20%281%29%20%281%29.glb';
+        const ANIM_JUMP_GLB_URL = './Jump.glb';
+
         const PLAYER_TARGET_HEIGHT = 2.4;
         const MAP_TARGET_SPAN = 180;
 
@@ -443,6 +449,12 @@
             fallbackGroup: null,
             customModel: null,
             mixer: null,
+            actions: {
+                idle: null,
+                run: null,
+                jump: null
+            },
+            activeAnimKey: null,
             hasCustomModel: false,
             leftLeg: null,
             rightLeg: null,
@@ -916,6 +928,55 @@
             );
         }
 
+        function loadExternalAnimationClip(url, key, loopMode = THREE.LoopRepeat) {
+            if (!player.mixer || typeof THREE.GLTFLoader !== 'function') return;
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                url,
+                (gltf) => {
+                    if (!gltf || !Array.isArray(gltf.animations) || gltf.animations.length === 0) return;
+                    try {
+                        const action = player.mixer.clipAction(gltf.animations[0]);
+                        action.setLoop(loopMode, Infinity);
+                        if (loopMode === THREE.LoopOnce) {
+                            action.clampWhenFinished = true;
+                        }
+                        player.actions[key] = action;
+                        if (key === 'idle' && !player.activeAnimKey) {
+                            setPlayerAnimation('idle');
+                        }
+                    } catch (err) {
+                        console.warn(`No se pudo enlazar animación ${key}:`, err);
+                    }
+                },
+                undefined,
+                (err) => {
+                    console.warn(`Error cargando animación ${url}:`, err);
+                }
+            );
+        }
+
+        function setPlayerAnimation(nextKey) {
+            if (!player.mixer || !player.hasCustomModel) return;
+            const nextAction = player.actions[nextKey];
+            if (!nextAction) return;
+
+            if (player.activeAnimKey === nextKey && nextAction.isRunning()) {
+                return;
+            }
+
+            const prevAction = player.activeAnimKey ? player.actions[player.activeAnimKey] : null;
+            nextAction.reset();
+            nextAction.setEffectiveTimeScale(1);
+            nextAction.setEffectiveWeight(1);
+            nextAction.play();
+
+            if (prevAction && prevAction !== nextAction) {
+                prevAction.crossFadeTo(nextAction, 0.16, true);
+            }
+            player.activeAnimKey = nextKey;
+        }
+
         function loadCustomPlayerGLB() {
             if (typeof THREE.GLTFLoader !== 'function') return;
 
@@ -967,11 +1028,17 @@
                         player.fallbackGroup.visible = false;
                     }
 
+                    player.mixer = new THREE.AnimationMixer(model);
+
                     if (Array.isArray(gltf.animations) && gltf.animations.length > 0) {
-                        player.mixer = new THREE.AnimationMixer(model);
-                        const action = player.mixer.clipAction(gltf.animations[0]);
-                        action.play();
+                        player.actions.idle = player.mixer.clipAction(gltf.animations[0]);
+                        player.actions.idle.play();
+                        player.activeAnimKey = 'idle';
                     }
+
+                    loadExternalAnimationClip(ANIM_IDLE_GLB_URL, 'idle', THREE.LoopRepeat);
+                    loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
+                    loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
                 },
                 undefined,
                 (err) => {
@@ -1344,7 +1411,7 @@
         }
 
         // ==========================================
-        // ANIMACIÓN PROCEDURAL (CAMINAR, CORRER, SALTAR)
+        // ANIMACIÓN GLB + PROCEDURAL (CAMINAR, CORRER, SALTAR)
         // ==========================================
         function updateProceduralMovementAnimation(dt, horizSpeed) {
             if (!player.visualPivot) return;
@@ -1353,6 +1420,18 @@
             const runRatio = Math.max(0, Math.min(1, (horizSpeed - 1.5) / 6.5));
             const targetBlend = isMoving ? 1 : 0;
             player.animBlend = THREE.MathUtils.lerp(player.animBlend, targetBlend, Math.min(1, dt * 12));
+
+            if (player.hasCustomModel && player.mixer) {
+                if (!player.onGround && player.actions.jump) {
+                    setPlayerAnimation('jump');
+                } else if (isMoving && player.actions.run) {
+                    const runAction = player.actions.run;
+                    runAction.setEffectiveTimeScale(THREE.MathUtils.clamp(0.85 + runRatio * 0.55, 0.85, 1.45));
+                    setPlayerAnimation('run');
+                } else if (player.actions.idle) {
+                    setPlayerAnimation('idle');
+                }
+            }
 
             if (isMoving) {
                 const cadence = 9.5 + runRatio * 6.5;
@@ -1367,7 +1446,6 @@
             let targetRollZ = 0;
 
             if (!player.onGround) {
-                // Pose dinámica de salto o caída
                 const airTilt = THREE.MathUtils.clamp(-player.vel.y * 0.014, -0.24, 0.22);
                 targetPitchX = airTilt;
                 targetPivotY = player.vel.y > 0 ? 0.14 : 0.04;
@@ -1395,7 +1473,6 @@
                 Math.min(1, dt * 14)
             );
 
-            // Animación de extremidades en el personaje cúbico de respaldo
             if (!player.hasCustomModel && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
                 if (!player.onGround) {
                     player.leftLeg.rotation.x = THREE.MathUtils.lerp(player.leftLeg.rotation.x, 0.45, Math.min(1, dt * 14));
