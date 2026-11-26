@@ -193,8 +193,9 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
 
-        // Coordenadas exactas del piso morado del Nivel 1
-        const DEFAULT_LEVEL_1_SPAWN = { x: 49.8, y: 4.6, z: -21.3 };
+        // Orientación inicial (en radianes) mirando hacia el camino de colores desde la plataforma morada
+        const LEVEL_1_FACING_YAW = -0.65;
+        const LEVEL_1_SPAWN_FACTORS = { x: 0.0, z: 0.45 };
 
         const state = {
             mode: 'lobby',
@@ -243,6 +244,15 @@
             return null;
         }
 
+        function applyFacingAngle(yawAngle) {
+            player.yaw = yawAngle;
+            camCtrl.yaw = yawAngle;
+            if (player.root) {
+                player.root.rotation.y = yawAngle;
+            }
+            snapCameraToPlayer();
+        }
+
         function saveCurrentPlayerAsLevel1Spawn() {
             if (!player.pos) return;
             const v = new THREE.Vector3(player.pos.x, player.pos.y + 0.1, player.pos.z);
@@ -251,7 +261,16 @@
             } catch (e) {}
             level1Spawn.copy(v);
             currentSpawn.copy(v);
-            showToast(`Inicio Nivel 1 fijado (${v.x.toFixed(1)}, ${v.y.toFixed(1)}, ${v.z.toFixed(1)})`, 2400);
+
+            let factorMsg = '';
+            if (mapBox) {
+                const halfX = Math.max(1, Math.abs(mapBox.max.x));
+                const halfZ = Math.max(1, Math.abs(mapBox.max.z));
+                const fx = (v.x / halfX).toFixed(2);
+                const fz = (v.z / halfZ).toFixed(2);
+                factorMsg = ` | fx:${fx}, fz:${fz}`;
+            }
+            showToast(`Pos (${v.x.toFixed(1)}, ${v.y.toFixed(1)}, ${v.z.toFixed(1)})${factorMsg}`, 3500);
         }
 
         let audioCtx = null;
@@ -362,7 +381,11 @@
                 lobbyEl.classList.add('hidden');
                 hudEl.classList.remove('hidden');
                 hudEl.classList.add('flex');
-                snapCameraToPlayer();
+                if (state.currentLevel === 1) {
+                    applyFacingAngle(LEVEL_1_FACING_YAW);
+                } else {
+                    snapCameraToPlayer();
+                }
                 startSuspenseMusic();
             } else {
                 lobbyEl.classList.remove('hidden');
@@ -421,8 +444,8 @@
         let mapMeshes = [];
         let mapBox = null;
         let lavaFloorY = -20;
-        let level1Spawn = new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.y, DEFAULT_LEVEL_1_SPAWN.z);
-        let currentSpawn = new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.y, DEFAULT_LEVEL_1_SPAWN.z);
+        let level1Spawn = new THREE.Vector3(0, 2, 0);
+        let currentSpawn = new THREE.Vector3(0, 2, 0);
 
         const raycaster = new THREE.Raycaster();
         const downDir = new THREE.Vector3(0, -1, 0);
@@ -450,9 +473,9 @@
             rightLeg: null,
             leftArm: null,
             rightArm: null,
-            pos: new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.y, DEFAULT_LEVEL_1_SPAWN.z),
+            pos: new THREE.Vector3(0, 2, 0),
             vel: new THREE.Vector3(0, 0, 0),
-            yaw: 0,
+            yaw: LEVEL_1_FACING_YAW,
             onGround: false,
             jumpsUsed: 0,
             maxJumps: 2,
@@ -460,7 +483,7 @@
             animBlend: 0
         };
 
-        const camCtrl = { yaw: 0, pitch: 0.22, distance: 8.2 };
+        const camCtrl = { yaw: LEVEL_1_FACING_YAW, pitch: 0.22, distance: 8.2 };
 
         function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
@@ -627,12 +650,18 @@
             }
         }
 
-        function findSurfaceHeightAt(x, z, startY = 120) {
+        function findSurfaceHeightAt(x, z, startY = 120, preferLowest = false) {
             if (!mapLoaded || mapMeshes.length === 0) return null;
             raycaster.set(new THREE.Vector3(x, startY, z), downDir);
             raycaster.far = 350;
             const hits = raycaster.intersectObjects(mapMeshes, true);
-            return hits.length > 0 ? hits[0].point.y : null;
+            if (hits.length === 0) return null;
+            if (!preferLowest) return hits[0].point.y;
+            let lowestY = hits[0].point.y;
+            for (const h of hits) {
+                if (h.point.y < lowestY) lowestY = h.point.y;
+            }
+            return lowestY;
         }
 
         function clearEntities() {
@@ -709,11 +738,26 @@
 
             let bestStart = savedSpawn;
             if (!bestStart) {
-                const surfY = findSurfaceHeightAt(DEFAULT_LEVEL_1_SPAWN.x, DEFAULT_LEVEL_1_SPAWN.z, searchTopY);
-                const startY = typeof surfY === 'number' && Math.abs(surfY - DEFAULT_LEVEL_1_SPAWN.y) < 3.0
-                    ? surfY + 0.05
-                    : DEFAULT_LEVEL_1_SPAWN.y;
-                bestStart = new THREE.Vector3(DEFAULT_LEVEL_1_SPAWN.x, startY, DEFAULT_LEVEL_1_SPAWN.z);
+                const candidateCoords = [
+                    [mapBox.max.x * LEVEL_1_SPAWN_FACTORS.x, mapBox.max.z * LEVEL_1_SPAWN_FACTORS.z],
+                    [0, mapBox.max.z * 0.42],
+                    [mapBox.min.x * 0.15, mapBox.max.z * 0.42],
+                    [mapBox.max.x * 0.15, mapBox.max.z * 0.42],
+                    [0, mapBox.max.z * 0.35]
+                ];
+                for (const [cx, cz] of candidateCoords) {
+                    const sy = findSurfaceHeightAt(cx, cz, searchTopY, true);
+                    if (typeof sy === 'number' && Number.isFinite(sy)) {
+                        bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
+                        break;
+                    }
+                }
+            }
+            if (!bestStart) {
+                const center = new THREE.Vector3();
+                mapBox.getCenter(center);
+                const sy = findSurfaceHeightAt(center.x, center.z, searchTopY, true);
+                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.35 : 1.2, center.z);
             }
 
             level1Spawn.copy(bestStart);
@@ -722,23 +766,23 @@
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
             if (player.root) player.root.position.copy(player.pos);
-            snapCameraToPlayer();
+            applyFacingAngle(LEVEL_1_FACING_YAW);
 
             let nextStageNumber = 2;
             for (let step = 1; step <= 20; step++) {
                 const frac = step / 21;
                 const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.24), frac);
                 const pz = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.72, frac);
-                const pSurfY = findSurfaceHeightAt(px, pz, searchTopY);
-                if (typeof pSurfY === 'number') {
-                    addCoin(px, pSurfY + 1.2, pz);
+                const surfY = findSurfaceHeightAt(px, pz, searchTopY, false);
+                if (typeof surfY === 'number') {
+                    addCoin(px, surfY + 1.2, pz);
                     if (step % 3 === 0 && nextStageNumber <= TOTAL_LEVELS) {
-                        addCheckpoint(px, pSurfY, pz, nextStageNumber);
+                        addCheckpoint(px, surfY, pz, nextStageNumber);
                         nextStageNumber += 1;
                     }
                     if (step % 4 === 0) {
                         const kind = step % 8 === 0 ? 'dragon' : (step % 2 === 0 ? 'eagle' : 'bird');
-                        addAerialEnemy(kind, px, pSurfY + 4.2, pz, 5.0, 1.9);
+                        addAerialEnemy(kind, px, surfY + 4.2, pz, 5.0, 1.9);
                     }
                 }
             }
@@ -752,14 +796,14 @@
                 player.vel.set(0, 0, 0);
                 player.jumpsUsed = 0;
                 if (player.root) player.root.position.copy(player.pos);
-                snapCameraToPlayer();
+                applyFacingAngle(LEVEL_1_FACING_YAW);
                 return;
             }
             const frac = Math.max(0, Math.min(1, (stageNum - 1) / (TOTAL_LEVELS - 1)));
             const spanX = mapBox.max.x - mapBox.min.x;
             const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.22);
             const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
-            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 40);
+            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 40, false);
             const destY = typeof surfY === 'number' ? surfY + 0.35 : level1Spawn.y;
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
@@ -1076,6 +1120,7 @@
             player.leftArm = leftArm;
             player.rightArm = rightArm;
             root.position.copy(player.pos);
+            root.rotation.y = player.yaw;
             scene.add(root);
 
             loadAmyPlayerGLB();
@@ -1165,7 +1210,11 @@
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
             if (player.root) player.root.position.copy(player.pos);
-            snapCameraToPlayer();
+            if (state.currentLevel === 1) {
+                applyFacingAngle(LEVEL_1_FACING_YAW);
+            } else {
+                snapCameraToPlayer();
+            }
             if (byHazard) showToast('¡Caíste en la lava! Regresaste al punto seguro', 1400);
         }
 
@@ -1521,7 +1570,7 @@
 
             if (state.mode !== 'playing') {
                 player.root.position.copy(player.pos);
-                player.root.rotation.y = elapsed * 0.45;
+                player.root.rotation.y = player.yaw;
                 updateProceduralMovementAnimation(dt, 0);
                 return;
             }
