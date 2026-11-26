@@ -155,7 +155,7 @@
         <div class="flex items-end justify-between gap-3">
             <div class="hidden sm:block pointer-events-none">
                 <span class="inline-block bg-slate-900/60 text-white/95 text-xs px-3.5 py-1 rounded-full backdrop-blur-sm">
-                    Izquierda: mover • Derecha: girar cámara / saltar • 2 dedos: zoom
+                    Izquierda: mover • Derecha: girar cámara / saltar • Pellizco suave: zoom
                 </span>
             </div>
             <div class="ml-auto pointer-events-auto">
@@ -195,8 +195,8 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const MIN_CAM_DIST = 3.5;
-        const MAX_CAM_DIST = 18.0;
+        const MIN_CAM_DIST = 5.5;
+        const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
         const MAX_CAM_PITCH = 1.05;
 
@@ -1346,15 +1346,6 @@
             canvas.addEventListener('touchstart', (e) => {
                 if (state.mode !== 'playing') return;
 
-                if (e.touches.length >= 2) {
-                    input.pinchActive = true;
-                    input.pinchStartDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
-                    input.pinchStartCamDist = camCtrl.distance;
-                    input.camTouchId = null;
-                    input.camMoved = true;
-                    return;
-                }
-
                 const halfW = window.innerWidth * 0.5;
                 for (let i = 0; i < e.changedTouches.length; i++) {
                     const t = e.changedTouches[i];
@@ -1366,7 +1357,7 @@
                         input.joyVecX = 0;
                         input.joyVecY = 0;
                         updateDynamicJoystickVisual(true, t.clientX, t.clientY, 0, 0);
-                    } else if (t.clientX >= halfW && input.camTouchId === null && !input.pinchActive) {
+                    } else if (t.clientX >= halfW && input.camTouchId === null) {
                         input.camTouchId = t.identifier;
                         input.camLastX = t.clientX;
                         input.camLastY = t.clientY;
@@ -1374,17 +1365,16 @@
                         input.camStartTime = performance.now();
                     }
                 }
+
+                // Solo preparar pellizco cuando ambos dedos están en la mitad derecha
+                if (e.touches.length === 2 && !input.joyActive) {
+                    input.pinchStartDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
+                    input.pinchStartCamDist = camCtrl.distance;
+                }
             }, { passive: true });
 
             canvas.addEventListener('touchmove', (e) => {
                 if (state.mode !== 'playing') return;
-
-                if (input.pinchActive && e.touches.length >= 2) {
-                    const currentDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
-                    const scale = input.pinchStartDist / currentDist;
-                    camCtrl.distance = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, input.pinchStartCamDist * scale));
-                    return;
-                }
 
                 if (input.joyActive && input.joyTouchId !== null) {
                     const jt = findTouchById(e.touches, input.joyTouchId);
@@ -1402,17 +1392,31 @@
                     }
                 }
 
-                if (input.camTouchId !== null && !input.pinchActive) {
+                if (input.camTouchId !== null) {
                     const ct = findTouchById(e.touches, input.camTouchId);
                     if (ct) {
                         const dx = ct.clientX - input.camLastX;
                         const dy = ct.clientY - input.camLastY;
                         if (Math.abs(dx) > 5 || Math.abs(dy) > 5) input.camMoved = true;
                         camCtrl.yaw -= dx * 0.0065;
-                        // dy < 0 es arrastrar hacia arriba -> baja pitch para mirar hacia el cielo
                         camCtrl.pitch = Math.max(MIN_CAM_PITCH, Math.min(MAX_CAM_PITCH, camCtrl.pitch + dy * 0.0055));
                         input.camLastX = ct.clientX;
                         input.camLastY = ct.clientY;
+                    }
+                }
+
+                // Pellizco controlado: solo si no se usa el joystick y hay cambio claro de distancia
+                if (!input.joyActive && e.touches.length === 2) {
+                    const currentDist = Math.max(10, getTouchDistance(e.touches[0], e.touches[1]));
+                    if (!input.pinchActive && Math.abs(currentDist - input.pinchStartDist) > 22) {
+                        input.pinchActive = true;
+                        input.pinchStartDist = currentDist;
+                        input.pinchStartCamDist = camCtrl.distance;
+                    }
+                    if (input.pinchActive) {
+                        const deltaPx = input.pinchStartDist - currentDist;
+                        const nextDist = input.pinchStartCamDist + deltaPx * 0.025;
+                        camCtrl.distance = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, nextDist));
                     }
                 }
             }, { passive: true });
@@ -1432,7 +1436,7 @@
 
                 if (input.camTouchId !== null && !findTouchById(e.touches, input.camTouchId)) {
                     const elapsedTap = performance.now() - input.camStartTime;
-                    if (!input.camMoved && !input.pinchActive && elapsedTap < 320 && state.mode === 'playing') {
+                    if (!input.camMoved && !input.pinchActive && elapsedTap < 340 && state.mode === 'playing') {
                         triggerJump();
                     }
                     input.camTouchId = null;
@@ -1446,7 +1450,7 @@
             canvas.addEventListener('wheel', (e) => {
                 if (state.mode !== 'playing') return;
                 e.preventDefault();
-                camCtrl.distance = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, camCtrl.distance + e.deltaY * 0.008));
+                camCtrl.distance = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, camCtrl.distance + e.deltaY * 0.006));
             }, { passive: false });
 
             let mouseDragging = false;
