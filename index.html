@@ -181,7 +181,7 @@
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_fixed_v8';
+        const STORAGE_KEY = 'obby_roblox_100_visible_v9';
 
         const PLAYER_GLB_URL = './character-opt%20%281%29.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -1014,6 +1014,15 @@
                     const model = gltf.scene;
                     let meshCount = 0;
 
+                    const visibleFallbackMat = new THREE.MeshStandardMaterial({
+                        color: 0x3b82f6,
+                        emissive: 0x1d4ed8,
+                        emissiveIntensity: 0.25,
+                        roughness: 0.4,
+                        metalness: 0.1,
+                        side: THREE.DoubleSide
+                    });
+
                     model.traverse((child) => {
                         child.visible = true;
                         if (child.isMesh) {
@@ -1023,12 +1032,21 @@
                             child.receiveShadow = true;
                             child.frustumCulled = false;
 
-                            if (child.material) {
+                            const hasValidTexture = Boolean(
+                                child.material &&
+                                (Array.isArray(child.material)
+                                    ? child.material.some(m => m && m.map)
+                                    : child.material.map)
+                            );
+
+                            if (!child.material || !hasValidTexture) {
+                                child.material = visibleFallbackMat;
+                            } else {
                                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                                 mats.forEach((m) => {
                                     m.visible = true;
-                                    m.transparent = false;
                                     m.opacity = 1;
+                                    m.transparent = false;
                                     m.side = THREE.DoubleSide;
                                     if (m.map) {
                                         m.map.encoding = THREE.sRGBEncoding;
@@ -1072,6 +1090,7 @@
                     player.hasCustomModel = true;
                     player.visualPivot.add(model);
 
+                    // Se mantiene oculto solo si la malla cargó con volumen visible
                     if (player.fallbackGroup) {
                         player.fallbackGroup.visible = false;
                     }
