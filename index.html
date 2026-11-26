@@ -184,6 +184,7 @@
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
+        const USE_STOP_WALKING_GLB = true; // Ponlo en false si ves que stop_walking.glb tumba o frena a Amy
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
 
@@ -822,11 +823,20 @@
                 }
                 const nodePath = track.name.slice(0, dotIdx);
                 const prop = track.name.slice(dotIdx);
-                const rawName = nodePath.split('|').pop().split(':').pop();
+                const rawName = nodePath.split('|').pop().split(':').pop().toLowerCase();
+
+                // Evita que la rotación o posición del hueso raíz/cadera acueste o desplace el modelo
+                const isRootOrHips =
+                    rawName === 'armature' ||
+                    rawName === 'root' ||
+                    rawName === 'rootnode' ||
+                    rawName.includes('hips');
+
+                if (isRootOrHips && (prop === '.quaternion' || prop === '.position')) {
+                    continue;
+                }
+
                 if (player.boneNames.size === 0 || player.boneNames.has(rawName) || player.boneNames.has(nodePath)) {
-                    if (prop === '.position' && (rawName.toLowerCase().includes('hips') || rawName.toLowerCase().includes('root'))) {
-                        continue;
-                    }
                     validTracks.push(track);
                 }
             }
@@ -968,7 +978,9 @@
                         player.activeAnimKey = 'idle';
                     }
 
-                    loadExternalAnimationClip(ANIM_IDLE_GLB_URL, 'idle', THREE.LoopRepeat);
+                    if (USE_STOP_WALKING_GLB) {
+                        loadExternalAnimationClip(ANIM_IDLE_GLB_URL, 'idle', THREE.LoopRepeat);
+                    }
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
@@ -1352,12 +1364,17 @@
             let targetRollZ = 0;
 
             if (!player.onGround) {
-                targetPitchX = THREE.MathUtils.clamp(-player.vel.y * 0.014, -0.24, 0.22);
-                targetPivotY = player.vel.y > 0 ? 0.14 : 0.04;
+                targetPitchX = THREE.MathUtils.clamp(-player.vel.y * 0.012, -0.18, 0.18);
+                targetPivotY = player.vel.y > 0 ? 0.12 : 0.04;
+            } else if (isMoving) {
+                targetPivotY = (0.06 + runRatio * 0.09) * bounceWave * player.animBlend;
+                targetPitchX = -(0.04 + runRatio * 0.08) * player.animBlend;
+                targetRollZ = strideWave * (0.025 + runRatio * 0.03) * player.animBlend;
             } else {
-                targetPivotY = (0.07 + runRatio * 0.11) * bounceWave * player.animBlend;
-                targetPitchX = -(0.06 + runRatio * 0.14) * player.animBlend;
-                targetRollZ = strideWave * (0.03 + runRatio * 0.04) * player.animBlend;
+                // Quieta en suelo: postura recta con leve respiración
+                targetPivotY = Math.sin(clock.getElapsedTime() * 2.5) * 0.025;
+                targetPitchX = 0;
+                targetRollZ = 0;
             }
 
             player.visualPivot.position.y = THREE.MathUtils.lerp(player.visualPivot.position.y, targetPivotY, Math.min(1, dt * 16));
