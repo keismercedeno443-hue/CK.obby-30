@@ -182,7 +182,7 @@
         // ==========================================
         const TOTAL_LEVELS = 30;
         const STORAGE_KEY = 'obby_roblox_aereo_v1';
-        const PLAYER_GLB_URL = './personaje.glb';
+        const PLAYER_GLB_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture-opt.glb';
         const PLAYER_TARGET_HEIGHT = 3.0;
 
         const state = {
@@ -328,7 +328,7 @@
         // INTERFAZ (HUD, LOBBY, NIVELES, TOAST)
         // ==========================================
         let toastTimeout = null;
-        function showToast(msg, duration = 1800) {
+        function showToast(msg, duration = 2000) {
             const banner = document.getElementById('toast-banner');
             const textEl = document.getElementById('toast-text');
             if (!banner || !textEl) return;
@@ -708,7 +708,6 @@
                         }
                     });
 
-                    // Escala automática para que encaje con el tamaño del Obby (~3.0 unidades de alto)
                     model.updateMatrixWorld(true);
                     const box = new THREE.Box3().setFromObject(model);
                     const size = new THREE.Vector3();
@@ -721,7 +720,6 @@
                         box.setFromObject(model);
                     }
 
-                    // Centrar en XZ y apoyar los pies exactamente en y = 0
                     const center = new THREE.Vector3();
                     box.getCenter(center);
                     model.position.x -= center.x;
@@ -746,11 +744,12 @@
                         action.play();
                     }
 
-                    showToast('¡Personaje 3D cargado!', 1400);
+                    showToast('¡Personaje 3D cargado!', 1600);
                 },
                 undefined,
                 (err) => {
-                    console.warn('No se pudo cargar ./personaje.glb, usando personaje base:', err);
+                    console.warn('No se pudo cargar el .glb, usando personaje base:', err);
+                    showToast('Aviso: no cargó el .glb, usando cubo base', 2200);
                 }
             );
         }
