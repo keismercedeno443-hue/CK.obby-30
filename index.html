@@ -3,172 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Obby 3D - 30 Niveles Largos</title>
+    <title>Obby 3D Estilo Roblox — Aventura Aérea</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="handleThreeFallback()"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/loaders/GLTFLoader.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-        }
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #38bdf8;
-            font-family: 'Inter', sans-serif;
             touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Inter', sans-serif;
+            background: #1d4ed8;
+        }
+        .roblox-title {
+            font-family: 'Fredoka', 'Inter', sans-serif;
         }
         #game-canvas {
-            position: fixed;
-            inset: 0;
-            width: 100vw;
-            height: 100vh;
             display: block;
+            width: 100%;
+            height: 100%;
         }
-        #joystick-zone {
+        .roblox-btn {
+            transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.15s ease;
+            box-shadow: 0 4px 0 rgba(15, 23, 42, 0.35);
+        }
+        .roblox-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 rgba(15, 23, 42, 0.35);
+        }
+        #dynamic-joy-base {
             position: fixed;
-            left: 24px;
-            bottom: 24px;
-            width: 132px;
-            height: 132px;
+            width: 112px;
+            height: 112px;
             border-radius: 9999px;
-            background: rgba(15, 23, 42, 0.45);
-            border: 2px solid rgba(255, 255, 255, 0.22);
-            backdrop-filter: blur(6px);
-            z-index: 20;
-            touch-action: none;
+            background: rgba(255, 255, 255, 0.16);
+            border: 2px solid rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(4px);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            display: none;
+            z-index: 25;
         }
-        #joystick-knob {
+        #dynamic-joy-knob {
             position: absolute;
+            width: 48px;
+            height: 48px;
             left: 50%;
             top: 50%;
-            width: 54px;
-            height: 54px;
-            margin-left: -27px;
-            margin-top: -27px;
             border-radius: 9999px;
-            background: linear-gradient(145deg, #38bdf8, #2563eb);
-            border: 2px solid rgba(255, 255, 255, 0.65);
-            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.55);
-            pointer-events: none;
-        }
-        #jump-btn {
-            position: fixed;
-            right: 28px;
-            bottom: 28px;
-            width: 88px;
-            height: 88px;
-            border-radius: 9999px;
-            background: linear-gradient(145deg, #fbbf24, #d97706);
-            border: 3px solid rgba(255, 255, 255, 0.7);
-            box-shadow: 0 8px 24px rgba(217, 119, 6, 0.5);
-            z-index: 20;
-            touch-action: none;
-        }
-        #jump-btn:active {
-            transform: scale(0.94);
+            background: rgba(255, 255, 255, 0.82);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.35);
+            transform: translate(-50%, -50%);
         }
     </style>
 </head>
 <body>
-    <!-- Lienzo principal 3D -->
     <canvas id="game-canvas"></canvas>
 
-    <!-- HUD Superior del Juego -->
-    <div id="game-hud" class="hidden fixed top-3 left-3 right-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
-        <div class="flex items-center gap-2 pointer-events-auto">
-            <button id="btn-hud-back" title="Volver al Lobby" class="bg-slate-900/85 hover:bg-slate-800 text-white w-9 h-9 rounded-full border border-white/15 text-sm font-black shadow-lg active:scale-95 transition flex items-center justify-center">
-                ✕
-            </button>
-            <div class="bg-slate-900/80 text-white px-3.5 py-2 rounded-2xl border border-white/15 backdrop-blur-md shadow-lg">
-                <span class="text-xs uppercase tracking-wider text-sky-300 font-bold">Nivel</span>
-                <span id="hud-level" class="text-base font-black ml-1">1 / 30</span>
-            </div>
-            <div class="bg-slate-900/80 text-amber-300 px-3.5 py-2 rounded-2xl border border-white/15 backdrop-blur-md shadow-lg font-extrabold text-sm">
-                🪙 <span id="hud-coins">0</span>
-            </div>
-            <div class="hidden sm:flex bg-slate-900/80 text-emerald-300 px-3 py-2 rounded-2xl border border-white/15 backdrop-blur-md shadow-lg font-bold text-xs">
-                Meta: <span id="hud-distance" class="ml-1 font-black">0m</span>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-2 pointer-events-auto">
-            <button id="btn-hud-levels" class="bg-slate-900/85 hover:bg-slate-800 text-white px-3 py-2 rounded-2xl border border-white/15 text-xs font-extrabold shadow-lg active:scale-95 transition">
-                Niveles
-            </button>
-            <button id="btn-hud-sound" class="bg-slate-900/85 hover:bg-slate-800 text-white px-3 py-2 rounded-2xl border border-white/15 text-xs font-extrabold shadow-lg active:scale-95 transition">
-                🔊
-            </button>
-            <button id="btn-hud-lobby" class="bg-rose-600/90 hover:bg-rose-500 text-white px-3 py-2 rounded-2xl border border-white/20 text-xs font-extrabold shadow-lg active:scale-95 transition">
-                Lobby
-            </button>
-        </div>
+    <!-- Joystick dinámico invisible hasta que se toca el lado izquierdo -->
+    <div id="dynamic-joy-base">
+        <div id="dynamic-joy-knob"></div>
     </div>
 
-    <!-- Mensaje flotante en pantalla -->
-    <div id="toast-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-30 bg-slate-900/90 text-white px-4 py-2 rounded-2xl border border-sky-400/40 text-xs sm:text-sm font-bold shadow-xl pointer-events-none text-center max-w-[90vw]">
+    <!-- Banner de notificación -->
+    <div id="toast-banner" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200">
+        <div id="toast-text" class="bg-slate-950/90 text-amber-300 border border-amber-400/40 px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold shadow-xl"></div>
     </div>
 
-    <!-- Controles táctiles para móvil -->
-    <div id="joystick-zone" class="hidden">
-        <div id="joystick-knob"></div>
-    </div>
-    <button id="jump-btn" class="hidden flex flex-col items-center justify-center text-slate-950 font-black">
-        <span class="text-xl leading-none">▲</span>
-        <span class="text-[11px] tracking-wide mt-0.5">SALTAR</span>
-    </button>
-
-    <!-- Lobby Principal -->
-    <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
-        <div class="w-full max-w-md bg-slate-900/95 border border-white/15 rounded-3xl p-6 text-white shadow-2xl">
-            <div class="text-center mb-5">
-                <span class="inline-block px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-extrabold uppercase tracking-wider mb-2">
-                    30 Niveles Largos 3D
-                </span>
-                <h1 class="text-3xl font-black tracking-tight">Obby 3D</h1>
-                <p class="text-slate-300 text-xs sm:text-sm mt-1">
-                    Recorridos largos de 12 a 16 etapas: caminos angostos, escaleras, lava 3D, rodillos y portales.
-                </p>
+    <!-- Pantalla de Inicio / Lobby estilo Roblox -->
+    <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-sky-500/75 via-blue-700/75 to-slate-950/85 backdrop-blur-sm">
+        <div class="w-full max-w-md bg-slate-900/90 border-2 border-white/20 rounded-3xl p-6 text-white shadow-2xl text-center">
+            <div class="inline-block bg-amber-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
+                OBBY 3D • AVENTURA AÉREA
             </div>
+            <h1 class="roblox-title text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+                Obby Aéreo Roblox
+            </h1>
+            <p class="text-slate-300 text-xs sm:text-sm mb-5">
+                Salta entre pisos, descansa en zonas seguras, esquiva la lava y derriba aves, águilas y dragones.
+            </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3 text-center">
-                    <div class="text-[11px] uppercase text-slate-400 font-bold">Nivel Actual</div>
-                    <div id="lobby-unlocked" class="text-xl font-black text-sky-400 mt-0.5">1 / 30</div>
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Etapa Máxima</div>
+                    <div id="lobby-max-level" class="text-lg font-black text-sky-300 mt-0.5">1 / 30</div>
                 </div>
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3 text-center">
-                    <div class="text-[11px] uppercase text-slate-400 font-bold">Monedas</div>
-                    <div id="lobby-coins" class="text-xl font-black text-amber-400 mt-0.5">🪙 0</div>
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas</div>
+                    <div id="lobby-coins" class="text-lg font-black text-amber-300 mt-0.5">0</div>
                 </div>
             </div>
 
-            <div class="space-y-2.5">
-                <button id="btn-play" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-base shadow-lg active:scale-[0.99] transition">
-                    ▶ Jugar
+            <div class="flex flex-col gap-2.5">
+                <button id="btn-play" class="roblox-btn w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-base tracking-wide">
+                    ▶ JUGAR AHORA
                 </button>
-                <button id="btn-select-level" class="w-full py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 text-white font-extrabold text-sm shadow-lg active:scale-[0.99] transition">
-                    🗺️ Elegir Nivel
-                </button>
-                <button id="btn-toggle-sound" class="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-100 font-bold text-sm active:scale-[0.99] transition">
-                    🔊 Sonido y Música: Activado
+                <button id="btn-open-levels" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
+                    🗺️ Elegir Etapa (1 - 30)
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Selector de Niveles -->
-    <div id="level-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-        <div class="w-full max-w-lg bg-slate-900 border border-white/15 rounded-3xl p-5 text-white shadow-2xl max-h-[85vh] flex flex-col">
+    <!-- HUD Superior y Controles en Juego -->
+    <div id="hud-layer" class="fixed inset-0 pointer-events-none z-20 hidden flex-col justify-between p-3 sm:p-5">
+        <div class="flex items-start justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2 pointer-events-auto">
+                <button id="btn-hud-lobby" class="roblox-btn bg-amber-400 hover:bg-amber-300 text-slate-900 px-3 py-2 rounded-2xl border-2 border-slate-900/20 text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+                    <span>🏠</span>
+                    <span>Inicio</span>
+                </button>
+                <button id="btn-hud-levels" class="roblox-btn bg-sky-400 hover:bg-sky-300 text-slate-950 px-3 py-2 rounded-2xl border-2 border-slate-900/20 text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+                    <span>🗺️</span>
+                    <span>Etapas</span>
+                </button>
+            </div>
+
+            <!-- Barra central estilo Roblox (17/30) -->
+            <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto bg-indigo-950/65 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-indigo-300/35 shadow-lg">
+                <button id="btn-stage-first" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Primera etapa">«</button>
+                <button id="btn-stage-prev" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Etapa anterior">‹</button>
+                <div class="px-2.5 sm:px-3.5 py-0.5 rounded-full bg-indigo-600/90 border border-indigo-200/40 text-white font-black text-xs sm:text-sm tracking-wide">
+                    <span id="hud-level-text" class="text-amber-300">1</span><span class="text-indigo-200/80">/30</span>
+                </div>
+                <button id="btn-stage-next" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Siguiente etapa">›</button>
+                <button id="btn-stage-max" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Etapa máxima desbloqueada">»</button>
+            </div>
+
+            <div class="flex items-center gap-2 pointer-events-auto">
+                <div class="bg-slate-900/80 text-amber-300 px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl border border-amber-400/40 font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow">
+                    <span>🪙</span>
+                    <span id="hud-coins-text">0</span>
+                </div>
+                <button id="btn-hud-sound" class="roblox-btn bg-slate-800/85 hover:bg-slate-700 text-white p-2.5 rounded-2xl border border-white/20 text-sm font-bold" title="Sonido">
+                    🔊
+                </button>
+            </div>
+        </div>
+
+        <!-- Zona inferior: botón de disparar cómodo en esquina inferior derecha -->
+        <div class="flex items-end justify-between gap-3">
+            <div class="hidden sm:block pointer-events-none">
+                <span class="inline-block bg-slate-900/60 text-white/95 text-xs px-3.5 py-1 rounded-full backdrop-blur-sm">
+                    Izquierda: mover • Derecha: saltar / cámara • Disparar (F)
+                </span>
+            </div>
+            <div class="ml-auto mb-4 mr-2 sm:mb-6 sm:mr-5 pointer-events-auto flex items-center gap-2.5">
+                <button id="btn-hud-shoot" class="roblox-btn w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-rose-500 hover:bg-rose-400 text-white border-2 border-rose-200/70 font-black text-xs sm:text-sm flex flex-col items-center justify-center shadow-xl" title="Disparar (F)">
+                    <span class="text-xl leading-none">⚡</span>
+                    <span class="text-[10px] tracking-wide mt-0.5">FUEGO</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Selector de Etapas -->
+    <div id="levels-modal" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+        <div class="w-full max-w-lg bg-slate-900 border-2 border-white/20 rounded-3xl p-5 sm:p-6 text-white shadow-2xl max-h-[82vh] flex flex-col">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-black">Seleccionar Nivel (1 - 30)</h2>
-                <button id="btn-close-levels" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold">
-                    Cerrar
+                <h2 class="roblox-title text-xl sm:text-2xl font-bold">Seleccionar Etapa</h2>
+                <button id="btn-close-levels" class="roblox-btn bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                    ✕ Cerrar
                 </button>
             </div>
             <div id="levels-grid" class="grid grid-cols-5 gap-2 overflow-y-auto pr-1"></div>
@@ -176,25 +177,17 @@
     </div>
 
     <script>
-        // =========================================================================
-        // RESPUESTA DE RESPALDO DE THREE.JS CDN
-        // =========================================================================
-        function handleThreeFallback() {
-            const s = document.createElement('script');
-            s.src = 'https://unpkg.com/three@0.128.0/build/three.min.js';
-            document.head.appendChild(s);
-        }
-
-        // =========================================================================
-        // ESTADO GLOBAL Y PERSISTENCIA
-        // =========================================================================
+        // ==========================================
+        // CONFIGURACIÓN Y ESTADO PERSISTENTE
+        // ==========================================
         const TOTAL_LEVELS = 30;
-        const STORAGE_KEY = 'obby3d_estado_limpio_v1';
+        const STORAGE_KEY = 'obby_roblox_aereo_v1';
+        const CUSTOM_CHARACTER_URL = './Sara-opt.glb';
 
         const state = {
-            mode: 'lobby', // 'lobby' | 'playing'
+            mode: 'lobby',
             currentLevel: 1,
-            unlockedLevel: 1,
+            maxUnlockedLevel: 1,
             coins: 0,
             soundEnabled: true
         };
@@ -205,10 +198,10 @@
                 if (!raw) return;
                 const parsed = JSON.parse(raw);
                 if (typeof parsed.currentLevel === 'number') {
-                    state.currentLevel = Math.min(TOTAL_LEVELS, Math.max(1, parsed.currentLevel));
+                    state.currentLevel = Math.max(1, Math.min(TOTAL_LEVELS, parsed.currentLevel));
                 }
-                if (typeof parsed.unlockedLevel === 'number') {
-                    state.unlockedLevel = Math.min(TOTAL_LEVELS, Math.max(1, parsed.unlockedLevel));
+                if (typeof parsed.maxUnlockedLevel === 'number') {
+                    state.maxUnlockedLevel = Math.max(1, Math.min(TOTAL_LEVELS, parsed.maxUnlockedLevel));
                 }
                 if (typeof parsed.coins === 'number') {
                     state.coins = Math.max(0, Math.floor(parsed.coins));
@@ -216,8 +209,8 @@
                 if (typeof parsed.soundEnabled === 'boolean') {
                     state.soundEnabled = parsed.soundEnabled;
                 }
-            } catch (e) {
-                console.warn('Error cargando estado:', e);
+            } catch (err) {
+                console.warn('Error cargando progreso:', err);
             }
         }
 
@@ -225,54 +218,38 @@
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
                     currentLevel: state.currentLevel,
-                    unlockedLevel: state.unlockedLevel,
+                    maxUnlockedLevel: state.maxUnlockedLevel,
                     coins: state.coins,
                     soundEnabled: state.soundEnabled
                 }));
-            } catch (e) {
-                console.warn('Error guardando estado:', e);
+            } catch (err) {
+                console.warn('Error guardando progreso:', err);
             }
         }
 
-        let toastTimeout = null;
-        function showToast(msg, duration = 2200) {
-            const el = document.getElementById('toast-banner');
-            if (!el) return;
-            el.textContent = msg;
-            el.classList.remove('hidden');
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                el.classList.add('hidden');
-            }, duration);
-        }
-
-        // =========================================================================
-        // AUDIO Y MÚSICA PROCEDURAL (WEB AUDIO API)
-        // =========================================================================
+        // ==========================================
+        // AUDIO PROCEDURAL + MÚSICA DE SUSPENSO
+        // ==========================================
         let audioCtx = null;
         let bgmTimer = null;
         let bgmStep = 0;
-        const melodyNotes = [261.63, 329.63, 392.00, 523.25, 440.00, 392.00, 329.63, 349.23];
-        const bassNotes = [130.81, 130.81, 196.00, 196.00, 146.83, 146.83, 174.61, 196.00];
 
-        function getAudioCtx() {
+        function ensureAudioContext() {
             if (!state.soundEnabled) return null;
-            try {
-                if (!audioCtx) {
-                    const Ctx = window.AudioContext || window.webkitAudioContext;
-                    if (Ctx) audioCtx = new Ctx();
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
                 }
-                if (audioCtx && audioCtx.state === 'suspended') {
-                    audioCtx.resume().catch(() => {});
-                }
-                return audioCtx;
-            } catch (e) {
-                return null;
             }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
         }
 
-        function playTone(freq, duration, type = 'sine', volume = 0.08, endFreq = null) {
-            const ctx = getAudioCtx();
+        function playTone(freq, duration, type = 'sine', volume = 0.08, slideToFreq = null) {
+            const ctx = ensureAudioContext();
             if (!ctx) return;
             try {
                 const now = ctx.currentTime;
@@ -280,56 +257,172 @@
                 const gain = ctx.createGain();
                 osc.type = type;
                 osc.frequency.setValueAtTime(freq, now);
-                if (endFreq !== null) {
-                    osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+                if (slideToFreq) {
+                    osc.frequency.exponentialRampToValueAtTime(Math.max(40, slideToFreq), now + duration);
                 }
-                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.setValueAtTime(0.0001, now);
                 gain.gain.linearRampToValueAtTime(volume, now + 0.015);
-                gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
                 osc.connect(gain);
                 gain.connect(ctx.destination);
                 osc.start(now);
                 osc.stop(now + duration + 0.02);
-            } catch (e) {
-                // Ignorar restricciones de audio del navegador
+            } catch (err) {
+                // Ignorar errores de audio en navegadores restringidos
             }
         }
 
-        function sfxJump() { playTone(230, 0.16, 'triangle', 0.11, 520); }
-        function sfxCoin() { playTone(784, 0.09, 'sine', 0.09, 1046.5); }
-        function sfxCheckpoint() { playTone(440, 0.11, 'sine', 0.09, 659.25); }
-        function sfxPortal() {
-            playTone(523.25, 0.14, 'triangle', 0.11, 783.99);
-            setTimeout(() => playTone(783.99, 0.22, 'triangle', 0.11, 1046.5), 110);
+        function sfxJump() { playTone(310, 0.14, 'square', 0.06, 620); }
+        function sfxCoin() {
+            playTone(880, 0.08, 'sine', 0.08, 1174.66);
+            setTimeout(() => playTone(1318.5, 0.12, 'sine', 0.07), 65);
         }
-        function sfxLava() { playTone(190, 0.24, 'sawtooth', 0.09, 75); }
+        function sfxCheckpoint() {
+            playTone(523.25, 0.09, 'triangle', 0.09, 659.25);
+            setTimeout(() => playTone(783.99, 0.14, 'triangle', 0.09, 1046.5), 75);
+        }
+        function sfxShoot() { playTone(780, 0.08, 'square', 0.065, 240); }
+        function sfxEnemyDown() {
+            playTone(320, 0.12, 'sawtooth', 0.085, 110);
+            setTimeout(() => playTone(660, 0.1, 'triangle', 0.07, 940), 60);
+        }
+        function sfxPortal() {
+            const notes = [523.25, 659.25, 783.99, 1046.5];
+            notes.forEach((n, idx) => {
+                setTimeout(() => playTone(n, 0.16, 'triangle', 0.085), idx * 75);
+            });
+        }
+        function sfxFail() { playTone(220, 0.25, 'sawtooth', 0.08, 95); }
 
-        function startBgm() {
-            if (bgmTimer) return;
+        function startSuspenseMusic() {
+            stopSuspenseMusic();
+            if (!state.soundEnabled) return;
+            ensureAudioContext();
+            const bassNotes = [110, 110, 130.81, 123.47, 110, 110, 146.83, 138.59];
+            const tensionLead = [440, 0, 466.16, 440, 392, 0, 349.23, 369.99];
+
             bgmTimer = setInterval(() => {
                 if (!state.soundEnabled || state.mode !== 'playing') return;
-                const idx = bgmStep % melodyNotes.length;
-                bgmStep += 1;
-                playTone(melodyNotes[idx], 0.22, 'triangle', 0.045);
-                if (idx % 2 === 0) {
-                    playTone(bassNotes[idx], 0.32, 'sine', 0.045);
+                const idx = bgmStep % bassNotes.length;
+                playTone(bassNotes[idx], 0.13, 'triangle', 0.045);
+                if (tensionLead[idx] > 0) {
+                    playTone(tensionLead[idx], 0.11, 'sawtooth', 0.025);
                 }
-            }, 340);
+                if (bgmStep % 2 === 0) {
+                    playTone(1250, 0.025, 'sine', 0.018);
+                }
+                bgmStep += 1;
+            }, 230);
         }
 
-        ['pointerdown', 'touchstart', 'keydown'].forEach((evt) => {
-            window.addEventListener(evt, () => {
-                getAudioCtx();
-                if (state.soundEnabled) startBgm();
-            }, { passive: true });
-        });
+        function stopSuspenseMusic() {
+            if (bgmTimer) {
+                clearInterval(bgmTimer);
+                bgmTimer = null;
+            }
+        }
 
-        // =========================================================================
-        // MOTOR THREE.JS, PERSONAJE Y NIVELES DE 12 A 16 ETAPAS
-        // =========================================================================
-        let scene, camera, renderer;
-        let levelGroup, wallGroup, sceneryGroup;
-        let playerGroup, headMesh, torsoMesh, leftArmPivot, rightArmPivot, leftLegPivot, rightLegPivot;
+        // ==========================================
+        // INTERFAZ (HUD, LOBBY, NIVELES, TOAST)
+        // ==========================================
+        let toastTimeout = null;
+        function showToast(msg, duration = 1800) {
+            const banner = document.getElementById('toast-banner');
+            const textEl = document.getElementById('toast-text');
+            if (!banner || !textEl) return;
+            textEl.textContent = msg;
+            banner.classList.remove('opacity-0');
+            banner.classList.add('opacity-100');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                banner.classList.remove('opacity-100');
+                banner.classList.add('opacity-0');
+            }, duration);
+        }
+
+        function updateHud() {
+            document.getElementById('hud-level-text').textContent = String(state.currentLevel);
+            document.getElementById('hud-coins-text').textContent = String(state.coins);
+            document.getElementById('lobby-max-level').textContent = `${state.maxUnlockedLevel} / ${TOTAL_LEVELS}`;
+            document.getElementById('lobby-coins').textContent = String(state.coins);
+            const soundBtn = document.getElementById('btn-hud-sound');
+            if (soundBtn) {
+                soundBtn.textContent = state.soundEnabled ? '🔊' : '🔇';
+            }
+        }
+
+        function setMode(newMode) {
+            state.mode = newMode;
+            const lobbyEl = document.getElementById('lobby-screen');
+            const hudEl = document.getElementById('hud-layer');
+            const joyEl = document.getElementById('dynamic-joy-base');
+
+            if (newMode === 'playing') {
+                lobbyEl.classList.add('hidden');
+                hudEl.classList.remove('hidden');
+                hudEl.classList.add('flex');
+                startSuspenseMusic();
+            } else {
+                lobbyEl.classList.remove('hidden');
+                hudEl.classList.add('hidden');
+                hudEl.classList.remove('flex');
+                if (joyEl) joyEl.style.display = 'none';
+                stopSuspenseMusic();
+            }
+            updateHud();
+        }
+
+        function openLevelsModal() {
+            const modal = document.getElementById('levels-modal');
+            const grid = document.getElementById('levels-grid');
+            if (!modal || !grid) return;
+            grid.innerHTML = '';
+
+            for (let i = 1; i <= TOTAL_LEVELS; i++) {
+                const unlocked = i <= state.maxUnlockedLevel;
+                const isCurrent = i === state.currentLevel;
+                const btn = document.createElement('button');
+                btn.className = `roblox-btn py-2.5 rounded-xl font-extrabold text-xs sm:text-sm border ${
+                    !unlocked
+                        ? 'bg-slate-800/50 text-slate-500 border-white/5 cursor-not-allowed'
+                        : isCurrent
+                            ? 'bg-amber-400 text-slate-950 border-amber-200'
+                            : 'bg-sky-500/90 hover:bg-sky-400 text-slate-950 border-white/20'
+                }`;
+                btn.textContent = unlocked ? `${i}` : `🔒${i}`;
+                btn.disabled = !unlocked;
+                btn.addEventListener('click', () => {
+                    if (!unlocked) return;
+                    state.currentLevel = i;
+                    saveState();
+                    buildLevel(i);
+                    closeLevelsModal();
+                    setMode('playing');
+                    showToast(`Etapa ${i} cargada`);
+                });
+                grid.appendChild(btn);
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeLevelsModal() {
+            const modal = document.getElementById('levels-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ==========================================
+        // ESCENA THREE.JS, TEXTURAS Y MUNDO ABIERTO
+        // ==========================================
+        let scene, camera, renderer, clock;
+        let levelGroup, sceneryGroup;
+        let lavaSeaMesh, lavaSeaMat;
+        let portalMesh = null, portalPos = null;
+        let currentSpawn = new THREE.Vector3(0, 2, 0);
 
         const platforms = [];
         const ladders = [];
@@ -337,319 +430,392 @@
         const coins = [];
         const spinners = [];
         const checkpoints = [];
-        const wallMeshes = [];
         const lavaSplashes = [];
-        let lavaFloorMesh = null;
-        let lavaCrustMesh = null;
-        let lavaSurfaceY = -8.5;
-        let portalMesh = null;
-        let portalPos = null;
+        const aerialEnemies = [];
+        const playerShots = [];
+        const enemyFireballs = [];
         const studTextureCache = new Map();
-        let lavaWaveGeo = null;
-        let lavaWaveBasePos = null;
-        let splashSpawnTimer = 0;
+
         const player = {
-            pos: null,
-            vel: null,
-            spawn: null,
-            radius: 0.42,
-            height: 1.85,
-            onGround: false,
+            root: null,
+            leftLeg: null,
+            rightLeg: null,
+            leftArm: null,
+            rightArm: null,
+            pos: new THREE.Vector3(0, 2, 0),
+            vel: new THREE.Vector3(0, 0, 0),
             yaw: 0,
+            onGround: false,
+            jumpsUsed: 0,
+            maxJumps: 2,
             walkCycle: 0
         };
 
         const camCtrl = {
             yaw: 0,
             pitch: 0.34,
-            distance: 9.5,
-            minDist: 4.5,
-            maxDist: 18.0
+            distance: 11.5
         };
 
-        function createRobloxFaceTexture() {
-            const c = document.createElement('canvas');
-            c.width = 128;
-            c.height = 128;
-            const g = c.getContext('2d');
-            g.fillStyle = '#fde047';
-            g.fillRect(0, 0, 128, 128);
-            g.fillStyle = '#0f172a';
-            g.beginPath();
-            g.ellipse(42, 54, 8, 12, 0, 0, Math.PI * 2);
-            g.ellipse(86, 54, 8, 12, 0, 0, Math.PI * 2);
-            g.fill();
-            g.fillStyle = '#ffffff';
-            g.beginPath();
-            g.arc(44, 50, 3, 0, Math.PI * 2);
-            g.arc(88, 50, 3, 0, Math.PI * 2);
-            g.fill();
-            g.strokeStyle = '#0f172a';
-            g.lineWidth = 6;
-            g.lineCap = 'round';
-            g.beginPath();
-            g.arc(64, 72, 22, 0.15 * Math.PI, 0.85 * Math.PI);
-            g.stroke();
-            const tex = new THREE.CanvasTexture(c);
-            tex.needsUpdate = true;
-            return tex;
-        }
+        function getStuddedMaterial(hexColor, roughness = 0.55) {
+            const key = `${hexColor}_${roughness}`;
+            let tex = studTextureCache.get(key);
+            if (!tex) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                const base = new THREE.Color(hexColor);
+                const r = Math.round(base.r * 255);
+                const g = Math.round(base.g * 255);
+                const b = Math.round(base.b * 255);
 
-        function createLavaTexture() {
-            const c = document.createElement('canvas');
-            c.width = 512;
-            c.height = 512;
-            const g = c.getContext('2d');
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(0, 0, 128, 128);
 
-            const grad = g.createLinearGradient(0, 0, 512, 512);
-            grad.addColorStop(0, '#fffbeb');
-            grad.addColorStop(0.24, '#facc15');
-            grad.addColorStop(0.55, '#f97316');
-            grad.addColorStop(0.85, '#dc2626');
-            grad.addColorStop(1, '#7f1d1d');
-            g.fillStyle = grad;
-            g.fillRect(0, 0, 512, 512);
+                ctx.strokeStyle = 'rgba(15, 23, 42, 0.22)';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(2, 2, 124, 124);
 
-            // Bandas fluidas y remolinos de lava líquida
-            for (let b = 0; b < 18; b++) {
-                const y0 = (b / 18) * 512;
-                const bGrad = g.createLinearGradient(0, y0 - 18, 0, y0 + 22);
-                bGrad.addColorStop(0, 'rgba(220, 38, 38, 0)');
-                bGrad.addColorStop(0.5, b % 2 === 0 ? 'rgba(254, 240, 138, 0.58)' : 'rgba(251, 146, 60, 0.62)');
-                bGrad.addColorStop(1, 'rgba(220, 38, 38, 0)');
-                g.fillStyle = bGrad;
-                g.beginPath();
-                g.moveTo(0, y0);
-                for (let x = 0; x <= 512; x += 32) {
-                    const waveY = y0 + Math.sin(x * 0.025 + b * 1.1) * 14;
-                    g.lineTo(x, waveY);
+                const coords = [32, 96];
+                for (const cx of coords) {
+                    for (const cy of coords) {
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgb(${Math.min(255, r + 28)},${Math.min(255, g + 28)},${Math.min(255, b + 28)})`;
+                        ctx.fill();
+                        ctx.lineWidth = 2.5;
+                        ctx.strokeStyle = 'rgba(15, 23, 42, 0.28)';
+                        ctx.stroke();
+                    }
                 }
-                for (let x = 512; x >= 0; x -= 32) {
-                    const waveY = y0 + 18 + Math.cos(x * 0.02 + b * 0.9) * 14;
-                    g.lineTo(x, waveY);
-                }
-                g.closePath();
-                g.fill();
+
+                tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.colorSpace = THREE.SRGBColorSpace;
+                studTextureCache.set(key, tex);
             }
 
-            // Burbujas brillantes y núcleos calientes líquidos
-            for (let i = 0; i < 54; i++) {
-                const bx = ((i * 89) % 484) + 14;
-                const by = ((i * 137) % 484) + 14;
-                const br = 8 + (i % 6) * 6;
-                const bGrad = g.createRadialGradient(bx - br * 0.25, by - br * 0.25, 1.5, bx, by, br);
-                bGrad.addColorStop(0, 'rgba(255, 255, 240, 0.92)');
-                bGrad.addColorStop(0.45, 'rgba(250, 204, 21, 0.68)');
-                bGrad.addColorStop(0.8, 'rgba(249, 115, 22, 0.32)');
-                bGrad.addColorStop(1, 'rgba(185, 28, 28, 0)');
-                g.fillStyle = bGrad;
-                g.beginPath();
-                g.arc(bx, by, br, 0, Math.PI * 2);
-                g.fill();
-            }
-
-            const tex = new THREE.CanvasTexture(c);
-            tex.wrapS = THREE.RepeatWrapping;
-            tex.wrapT = THREE.RepeatWrapping;
-            tex.repeat.set(22, 22);
-            tex.needsUpdate = true;
-            return tex;
-        }
-
-        function createRobloxStudTexture(hexColor = 0x3b82f6) {
-            const key = Number(hexColor).toString(16).padStart(6, '0');
-            if (studTextureCache.has(key)) {
-                return studTextureCache.get(key);
-            }
-
-            const c = document.createElement('canvas');
-            c.width = 128;
-            c.height = 128;
-            const g = c.getContext('2d');
-
-            const baseCol = new THREE.Color(hexColor);
-            const r = Math.round(baseCol.r * 255);
-            const gr = Math.round(baseCol.g * 255);
-            const b = Math.round(baseCol.b * 255);
-
-            const lightR = Math.min(255, Math.round(r * 1.24 + 14));
-            const lightG = Math.min(255, Math.round(gr * 1.24 + 14));
-            const lightB = Math.min(255, Math.round(b * 1.24 + 14));
-
-            const darkR = Math.max(0, Math.round(r * 0.72));
-            const darkG = Math.max(0, Math.round(gr * 0.72));
-            const darkB = Math.max(0, Math.round(b * 0.72));
-
-            g.fillStyle = `rgb(${r}, ${gr}, ${b})`;
-            g.fillRect(0, 0, 128, 128);
-
-            // Sutil cuadricula tipo bloque clásico de Roblox
-            g.strokeStyle = `rgba(${darkR}, ${darkG}, ${darkB}, 0.28)`;
-            g.lineWidth = 2;
-            g.strokeRect(1, 1, 126, 126);
-
-            // Patrón 2x2 de studs elevados con highlight superior y sombra inferior
-            const gridCount = 2;
-            const cell = 128 / gridCount;
-            for (let gx = 0; gx < gridCount; gx++) {
-                for (let gy = 0; gy < gridCount; gy++) {
-                    const cx = gx * cell + cell * 0.5;
-                    const cy = gy * cell + cell * 0.5;
-                    const radius = cell * 0.25;
-
-                    g.fillStyle = `rgba(${darkR}, ${darkG}, ${darkB}, 0.45)`;
-                    g.beginPath();
-                    g.arc(cx + 2, cy + 3, radius, 0, Math.PI * 2);
-                    g.fill();
-
-                    const studGrad = g.createRadialGradient(
-                        cx - radius * 0.3,
-                        cy - radius * 0.3,
-                        radius * 0.12,
-                        cx,
-                        cy,
-                        radius
-                    );
-                    studGrad.addColorStop(0, `rgb(${lightR}, ${lightG}, ${lightB})`);
-                    studGrad.addColorStop(0.75, `rgb(${r}, ${gr}, ${b})`);
-                    studGrad.addColorStop(1, `rgb(${darkR}, ${darkG}, ${darkB})`);
-
-                    g.fillStyle = studGrad;
-                    g.beginPath();
-                    g.arc(cx, cy, radius, 0, Math.PI * 2);
-                    g.fill();
-
-                    g.strokeStyle = `rgba(255, 255, 255, 0.24)`;
-                    g.lineWidth = 1.5;
-                    g.beginPath();
-                    g.arc(cx, cy, radius * 0.86, Math.PI * 1.15, Math.PI * 1.85);
-                    g.stroke();
-                }
-            }
-
-            const tex = new THREE.CanvasTexture(c);
-            tex.wrapS = THREE.RepeatWrapping;
-            tex.wrapT = THREE.RepeatWrapping;
-            tex.needsUpdate = true;
-            studTextureCache.set(key, tex);
-            return tex;
-        }
-
-        function createStuddedBlockMaterial(hexColor, roughness = 0.42, metalness = 0.06, repeatX = 1, repeatY = 1) {
-            const baseTex = createRobloxStudTexture(hexColor).clone();
-            baseTex.repeat.set(Math.max(1, repeatX), Math.max(1, repeatY));
-            baseTex.needsUpdate = true;
-            return new THREE.MeshStandardMaterial({
-                map: baseTex,
+            const mat = new THREE.MeshStandardMaterial({
+                map: tex.clone(),
                 roughness,
-                metalness
+                metalness: 0.08
             });
+            mat.map.needsUpdate = true;
+            return mat;
         }
 
-        function buildOpenWorldScenery(minX, maxX, minZ, maxZ, lavaFloorY) {
-            if (!sceneryGroup) return;
+        function createLiquidLavaTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
 
-            const centerX = (minX + maxX) * 0.5;
-            const centerZ = (minZ + maxZ) * 0.5;
-            const spanX = Math.max(40, maxX - minX);
-            const spanZ = Math.max(40, maxZ - minZ);
-            const outerRadius = Math.max(spanX, spanZ) * 0.68 + 38;
+            const grad = ctx.createLinearGradient(0, 0, 256, 256);
+            grad.addColorStop(0, '#ea580c');
+            grad.addColorStop(0.5, '#f97316');
+            grad.addColorStop(1, '#dc2626');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 256, 256);
 
-            const grassMat = createStuddedBlockMaterial(0x22c55e, 0.68, 0.03, 4, 4);
-            const dirtMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
-            const stoneMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.75 });
-            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.8 });
-            const leafMatA = createStuddedBlockMaterial(0x16a34a, 0.65, 0.02, 2, 2);
-            const leafMatB = createStuddedBlockMaterial(0x15803d, 0.68, 0.02, 2, 2);
+            for (let i = 0; i < 18; i++) {
+                ctx.beginPath();
+                const yBase = (i / 18) * 256;
+                for (let x = 0; x <= 256; x += 16) {
+                    const y = yBase + Math.sin((x / 256) * Math.PI * 4 + i) * 9;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = i % 2 === 0 ? 'rgba(254, 240, 138, 0.42)' : 'rgba(153, 27, 27, 0.45)';
+                ctx.lineWidth = 6;
+                ctx.stroke();
+            }
 
-            const islandCount = 14;
-            for (let i = 0; i < islandCount; i++) {
-                const angle = (i / islandCount) * Math.PI * 2 + 0.22;
-                const dist = outerRadius + ((i * 19) % 28);
-                const ix = centerX + Math.cos(angle) * dist;
-                const iz = centerZ + Math.sin(angle) * dist;
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(24, 24);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
 
-                const iw = 18 + ((i * 7) % 16);
-                const id = 18 + ((i * 11) % 16);
-                const ih = 14 + ((i * 5) % 18);
-                const topY = lavaFloorY + ih;
+        function buildOpenWorldScenery() {
+            while (sceneryGroup.children.length > 0) {
+                sceneryGroup.remove(sceneryGroup.children[0]);
+            }
 
-                const cliff = new THREE.Mesh(new THREE.BoxGeometry(iw, ih + 8, id), i % 2 === 0 ? dirtMat : stoneMat);
-                cliff.position.set(ix, lavaFloorY + (ih - 8) * 0.5, iz);
-                cliff.receiveShadow = true;
-                sceneryGroup.add(cliff);
+            const lavaTex = createLiquidLavaTexture();
+            lavaSeaMat = new THREE.MeshStandardMaterial({
+                map: lavaTex,
+                emissive: new THREE.Color(0xea580c),
+                emissiveMap: lavaTex,
+                emissiveIntensity: 0.75,
+                roughness: 0.2,
+                metalness: 0.1
+            });
 
-                const grassCap = new THREE.Mesh(new THREE.BoxGeometry(iw + 0.6, 1.4, id + 0.6), grassMat);
-                grassCap.position.set(ix, topY + 0.4, iz);
-                grassCap.receiveShadow = true;
-                sceneryGroup.add(grassCap);
+            const seaGeo = new THREE.PlaneGeometry(360, 360, 48, 48);
+            seaGeo.rotateX(-Math.PI / 2);
+            lavaSeaMesh = new THREE.Mesh(seaGeo, lavaSeaMat);
+            lavaSeaMesh.position.set(0, -14, -65);
+            sceneryGroup.add(lavaSeaMesh);
 
-                // Árboles estilizados en bloques tipo Roblox
-                const treeCount = 3 + (i % 3);
-                for (let t = 0; t < treeCount; t++) {
-                    const tx = ix + Math.sin(i * 5 + t * 2.1) * (iw * 0.28);
-                    const tz = iz + Math.cos(i * 3 + t * 2.4) * (id * 0.28);
-                    const trunkH = 3.2 + ((t + i) % 3) * 0.9;
+            const islandPositions = [
+                [-52, -9, -20, 22], [54, -8, -32, 24], [-64, -7, -75, 28],
+                [62, -6, -85, 26], [0, -10, -125, 34], [-45, -8, -145, 24]
+            ];
 
-                    const trunk = new THREE.Mesh(new THREE.BoxGeometry(1.1, trunkH, 1.1), trunkMat);
-                    trunk.position.set(tx, topY + 1.1 + trunkH * 0.5, tz);
-                    trunk.castShadow = true;
-                    sceneryGroup.add(trunk);
+            islandPositions.forEach(([ix, iy, iz, radius], idx) => {
+                const island = new THREE.Group();
+                island.position.set(ix, iy, iz);
 
-                    const crownSize = 3.6 + ((t * 7 + i) % 3) * 0.7;
-                    const crown = new THREE.Mesh(
-                        new THREE.BoxGeometry(crownSize, crownSize * 0.85, crownSize),
-                        (i + t) % 2 === 0 ? leafMatA : leafMatB
+                const dirt = new THREE.Mesh(
+                    new THREE.CylinderGeometry(radius, radius * 0.65, 10, 8),
+                    getStuddedMaterial(0x78350f, 0.8)
+                );
+                dirt.position.y = -5;
+                island.add(dirt);
+
+                const grass = new THREE.Mesh(
+                    new THREE.CylinderGeometry(radius * 1.03, radius, 2.2, 8),
+                    getStuddedMaterial(idx % 2 === 0 ? 0x22c55e : 0x16a34a, 0.65)
+                );
+                grass.position.y = 0.8;
+                island.add(grass);
+
+                for (let t = 0; t < 4; t++) {
+                    const ang = (t / 4) * Math.PI * 2 + idx;
+                    const tx = Math.cos(ang) * (radius * 0.48);
+                    const tz = Math.sin(ang) * (radius * 0.48);
+                    const trunk = new THREE.Mesh(
+                        new THREE.BoxGeometry(1.4, 3.6, 1.4),
+                        getStuddedMaterial(0x713f12, 0.75)
                     );
-                    crown.position.set(tx, topY + 1.1 + trunkH + crownSize * 0.35, tz);
-                    crown.castShadow = true;
-                    sceneryGroup.add(crown);
+                    trunk.position.set(tx, 3.6, tz);
+                    island.add(trunk);
+
+                    const crown = new THREE.Mesh(
+                        new THREE.BoxGeometry(4.4, 4.2, 4.4),
+                        getStuddedMaterial(0x15803d, 0.6)
+                    );
+                    crown.position.set(tx, 7.2, tz);
+                    island.add(crown);
+                }
+
+                sceneryGroup.add(island);
+            });
+
+            const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+            for (let c = 0; c < 14; c++) {
+                const cg = new THREE.Group();
+                const cx = (Math.random() - 0.5) * 180;
+                const cy = 22 + Math.random() * 14;
+                const cz = -15 - Math.random() * 140;
+                cg.position.set(cx, cy, cz);
+
+                const p1 = new THREE.Mesh(new THREE.BoxGeometry(7, 2.2, 4.5), cloudMat);
+                const p2 = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.8, 4), cloudMat);
+                p2.position.set(1.5, 1.1, 0);
+                cg.add(p1, p2);
+                sceneryGroup.add(cg);
+            }
+        }
+
+        function initLavaSplashPool() {
+            const geo = new THREE.SphereGeometry(0.22, 8, 8);
+            for (let i = 0; i < 42; i++) {
+                const isSpark = i % 3 === 0;
+                const mat = new THREE.MeshBasicMaterial({
+                    color: isSpark ? 0xfef08a : 0xf97316
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.visible = false;
+                sceneryGroup.add(mesh);
+                lavaSplashes.push({
+                    mesh,
+                    active: false,
+                    vel: new THREE.Vector3(),
+                    life: 0
+                });
+            }
+        }
+
+        function spawnLavaSplashDroplet(x, y, z) {
+            const slot = lavaSplashes.find(s => !s.active);
+            if (!slot) return;
+            slot.active = true;
+            slot.mesh.visible = true;
+            slot.mesh.position.set(x, y, z);
+            slot.vel.set(
+                (Math.random() - 0.5) * 4.5,
+                5.5 + Math.random() * 6.5,
+                (Math.random() - 0.5) * 4.5
+            );
+            slot.life = 0.85 + Math.random() * 0.45;
+        }
+
+        function updateLavaSplashes(dt) {
+            if (lavaSeaMat && lavaSeaMat.map) {
+                lavaSeaMat.map.offset.x += dt * 0.055;
+                lavaSeaMat.map.offset.y += dt * 0.04;
+            }
+
+            if (Math.random() < dt * 22 && player.pos) {
+                const sx = player.pos.x + (Math.random() - 0.5) * 34;
+                const sz = player.pos.z + (Math.random() - 0.5) * 34;
+                spawnLavaSplashDroplet(sx, -13.6, sz);
+            }
+
+            for (const s of lavaSplashes) {
+                if (!s.active) continue;
+                s.life -= dt;
+                s.vel.y -= 16.5 * dt;
+                s.mesh.position.addScaledVector(s.vel, dt);
+                if (s.life <= 0 || s.mesh.position.y < -14.5) {
+                    s.active = false;
+                    s.mesh.visible = false;
                 }
             }
         }
+
+        function buildRobloxPlayer() {
+            const root = new THREE.Group();
+
+            const shirtMat = getStuddedMaterial(0x2563eb, 0.5);
+            const pantsMat = getStuddedMaterial(0x1e293b, 0.6);
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.45 });
+            const capMat = getStuddedMaterial(0xdc2626, 0.5);
+
+            const placeholderGroup = new THREE.Group();
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.62), shirtMat);
+            torso.position.y = 1.65;
+            torso.castShadow = true;
+            placeholderGroup.add(torso);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), skinMat);
+            head.position.y = 2.7;
+            head.castShadow = true;
+            placeholderGroup.add(head);
+
+            const cap = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.34, 0.96), capMat);
+            cap.position.set(0, 3.12, -0.04);
+            placeholderGroup.add(cap);
+
+            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
+            leftLeg.position.set(-0.28, 0.52, 0);
+            leftLeg.castShadow = true;
+            placeholderGroup.add(leftLeg);
+
+            const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
+            rightLeg.position.set(0.28, 0.52, 0);
+            rightLeg.castShadow = true;
+            placeholderGroup.add(rightLeg);
+
+            const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
+            leftArm.position.set(-0.78, 1.68, 0);
+            leftArm.castShadow = true;
+            placeholderGroup.add(leftArm);
+
+            const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
+            rightArm.position.set(0.78, 1.68, 0);
+            rightArm.castShadow = true;
+            placeholderGroup.add(rightArm);
+
+            root.add(placeholderGroup);
+
+            player.root = root;
+            player.leftLeg = leftLeg;
+            player.rightLeg = rightLeg;
+            player.leftArm = leftArm;
+            player.rightArm = rightArm;
+            scene.add(root);
+
+            if (typeof THREE.GLTFLoader === 'function' && CUSTOM_CHARACTER_URL) {
+                const loader = new THREE.GLTFLoader();
+                loader.load(
+                    CUSTOM_CHARACTER_URL,
+                    (gltf) => {
+                        const model = gltf.scene;
+
+                        model.updateMatrixWorld(true);
+                        const box = new THREE.Box3().setFromObject(model);
+                        const size = new THREE.Vector3();
+                        box.getSize(size);
+
+                        const desiredHeight = 3.2;
+                        const scaleFactor = size.y > 0.0001 ? desiredHeight / size.y : 1;
+                        model.scale.setScalar(scaleFactor);
+
+                        model.updateMatrixWorld(true);
+                        const scaledBox = new THREE.Box3().setFromObject(model);
+                        const center = new THREE.Vector3();
+                        scaledBox.getCenter(center);
+
+                        model.position.x -= center.x;
+                        model.position.z -= center.z;
+                        model.position.y -= scaledBox.min.y;
+
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                            }
+                        });
+
+                        root.remove(placeholderGroup);
+                        root.add(model);
+
+                        player.leftLeg = null;
+                        player.rightLeg = null;
+                        player.leftArm = null;
+                        player.rightArm = null;
+
+                        showToast('¡Sara cargada en el Obby!', 1600);
+                    },
+                    undefined,
+                    (err) => {
+                        console.error('Error cargando Sara-opt.glb:', err);
+                        showToast('No se pudo cargar Sara-opt.glb; usando personaje base', 2200);
+                    }
+                );
+            }
+        }
+
         function initThree() {
             const canvas = document.getElementById('game-canvas');
-            if (!canvas || typeof THREE === 'undefined') return false;
-
-            player.pos = new THREE.Vector3(0, 0.1, 0);
-            player.vel = new THREE.Vector3(0, 0, 0);
-            player.spawn = new THREE.Vector3(0, 0.1, 0);
-
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x60a5fa);
+            scene.background = new THREE.Color(0x38bdf8);
             scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0042);
 
-            camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 380);
+            camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 450);
 
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+            clock = new THREE.Clock();
 
             const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.05);
-            hemiLight.position.set(0, 70, 0);
             scene.add(hemiLight);
 
             const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.15);
-            dirLight.position.set(32, 54, 26);
+            dirLight.position.set(28, 45, 22);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024;
             dirLight.shadow.mapSize.height = 1024;
-            dirLight.shadow.camera.near = 5;
-            dirLight.shadow.camera.far = 175;
-            const d = 48;
-            dirLight.shadow.camera.left = -d;
-            dirLight.shadow.camera.right = d;
-            dirLight.shadow.camera.top = d;
-            dirLight.shadow.camera.bottom = -d;
             scene.add(dirLight);
 
-            levelGroup = new THREE.Group();
-            wallGroup = new THREE.Group();
             sceneryGroup = new THREE.Group();
-            scene.add(sceneryGroup, levelGroup, wallGroup);
+            levelGroup = new THREE.Group();
+            scene.add(sceneryGroup, levelGroup);
 
+            buildOpenWorldScenery();
+            initLavaSplashPool();
             buildRobloxPlayer();
 
             window.addEventListener('resize', () => {
@@ -658,723 +824,769 @@
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
-
-            return true;
         }
 
+        // ==========================================
+        // CONSTRUCCIÓN DE NIVELES, PISOS Y ENEMIGOS
+        // ==========================================
         function clearLevel() {
-            if (!scene) return;
-            if (levelGroup) scene.remove(levelGroup);
-            if (wallGroup) scene.remove(wallGroup);
-            if (sceneryGroup) scene.remove(sceneryGroup);
-
-            levelGroup = new THREE.Group();
-            wallGroup = new THREE.Group();
-            sceneryGroup = new THREE.Group();
-            scene.add(sceneryGroup, levelGroup, wallGroup);
-
+            while (levelGroup.children.length > 0) {
+                levelGroup.remove(levelGroup.children[0]);
+            }
             platforms.length = 0;
             ladders.length = 0;
             lavaZones.length = 0;
             coins.length = 0;
             spinners.length = 0;
             checkpoints.length = 0;
-            wallMeshes.length = 0;
-            lavaSplashes.length = 0;
-            lavaFloorMesh = null;
-            lavaCrustMesh = null;
+            aerialEnemies.length = 0;
+            playerShots.length = 0;
+            enemyFireballs.length = 0;
             portalMesh = null;
             portalPos = null;
-            splashSpawnTimer = 0;
         }
 
-        function addSafeRestPlatform(x, y, z, w = 11.5, d = 9.5, color = 0x1e293b) {
-            // Plataforma bien ancha y estable sin movimiento para descansar, orientar la cámara y preparar saltos
-            return addPlatform(x, y, z, w, 1.0, d, color, {
-                roughness: 0.48,
-                metalness: 0.05
-            });
-        }
-
-        function initLavaSplashPool(minX, maxX, minZ, maxZ, surfaceY) {
-            lavaSurfaceY = surfaceY;
-            if (!levelGroup) return;
-
-            const dropletGeo = new THREE.OctahedronGeometry(0.2, 0);
-            const brightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-            const orangeMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
-
-            const poolCount = 42;
-            const spanX = Math.max(24, maxX - minX);
-            const spanZ = Math.max(24, maxZ - minZ);
-            const cx = (minX + maxX) * 0.5;
-            const cz = (minZ + maxZ) * 0.5;
-
-            for (let i = 0; i < poolCount; i++) {
-                const mesh = new THREE.Mesh(dropletGeo, i % 3 === 0 ? brightMat : orangeMat);
-                mesh.visible = false;
-                levelGroup.add(mesh);
-
-                lavaSplashes.push({
-                    mesh,
-                    active: false,
-                    x: cx,
-                    y: surfaceY,
-                    z: cz,
-                    vx: 0,
-                    vy: 0,
-                    vz: 0,
-                    age: 0,
-                    maxAge: 1.0,
-                    baseScale: 0.75 + (i % 4) * 0.25,
-                    spanX,
-                    spanZ,
-                    cx,
-                    cz
-                });
-            }
-        }
-
-        function spawnLavaSplashDroplet(fromHazard = false) {
-            if (!lavaSplashes.length) return;
-            const slot = lavaSplashes.find((s) => !s.active);
-            if (!slot) return;
-
-            let originX = slot.cx + (Math.random() - 0.5) * slot.spanX * 0.72;
-            let originZ = slot.cz + (Math.random() - 0.5) * slot.spanZ * 0.72;
-            let originY = lavaSurfaceY + 0.08;
-
-            if (fromHazard && lavaZones.length > 0) {
-                const hz = lavaZones[Math.floor(Math.random() * lavaZones.length)];
-                originX = hz.x + (Math.random() - 0.5) * Math.max(0.5, hz.w * 0.8);
-                originZ = hz.z + (Math.random() - 0.5) * Math.max(0.5, hz.d * 0.8);
-                originY = hz.y + hz.h * 0.5 + 0.06;
-            } else if (player && player.pos && Math.random() < 0.45) {
-                // Concentrar parte de las salpicaduras cerca del jugador para dar vida visible
-                originX = player.pos.x + (Math.random() - 0.5) * 26;
-                originZ = player.pos.z + (Math.random() - 0.5) * 26;
-            }
-
-            slot.active = true;
-            slot.x = originX;
-            slot.y = originY;
-            slot.z = originZ;
-            slot.vx = (Math.random() - 0.5) * 2.8;
-            slot.vy = fromHazard ? (5.2 + Math.random() * 3.4) : (6.4 + Math.random() * 4.6);
-            slot.vz = (Math.random() - 0.5) * 2.8;
-            slot.age = 0;
-            slot.maxAge = 0.75 + Math.random() * 0.65;
-            slot.mesh.position.set(slot.x, slot.y, slot.z);
-            slot.mesh.scale.setScalar(slot.baseScale);
-            slot.mesh.visible = true;
-        }
-
-        function updateLavaSplashes(dt) {
-            if (!lavaSplashes.length) return;
-
-            splashSpawnTimer += dt;
-            const spawnInterval = state.mode === 'playing' ? 0.055 : 0.09;
-            while (splashSpawnTimer >= spawnInterval) {
-                splashSpawnTimer -= spawnInterval;
-                spawnLavaSplashDroplet(lavaZones.length > 0 && Math.random() < 0.35);
-            }
-
-            const gravity = 16.5;
-            for (const s of lavaSplashes) {
-                if (!s.active) continue;
-                s.age += dt;
-                if (s.age >= s.maxAge) {
-                    s.active = false;
-                    s.mesh.visible = false;
-                    continue;
-                }
-
-                s.vy -= gravity * dt;
-                s.x += s.vx * dt;
-                s.y += s.vy * dt;
-                s.z += s.vz * dt;
-
-                const lifeRatio = 1 - (s.age / s.maxAge);
-                const scale = Math.max(0.12, s.baseScale * lifeRatio);
-                s.mesh.position.set(s.x, s.y, s.z);
-                s.mesh.scale.setScalar(scale);
-                s.mesh.rotation.x += 6 * dt;
-                s.mesh.rotation.y += 5 * dt;
-
-                if (s.y < lavaSurfaceY - 0.35 && s.vy < 0) {
-                    s.active = false;
-                    s.mesh.visible = false;
-                }
-            }
-        }
-
-        function addPlatform(x, y, z, w, h, d, color = 0x3b82f6, options = {}) {
-            const repX = Math.max(1, Math.round(w / 2.6));
-            const repZ = Math.max(1, Math.round(d / 2.6));
-            const mat = createStuddedBlockMaterial(
-                color,
-                options.roughness ?? 0.42,
-                options.metalness ?? 0.06,
-                repX,
-                repZ
+        function addPlatform(x, y, z, w, h, d, colorHex = 0xe2e8f0) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(w, h, d),
+                getStuddedMaterial(colorHex, 0.5)
             );
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
             mesh.position.set(x, y, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             levelGroup.add(mesh);
 
-            const plat = {
-                mesh,
+            platforms.push({
                 x, y, z, w, h, d,
-                baseX: x, baseY: y, baseZ: z,
-                moveAxis: options.moveAxis || null,
-                moveAmp: options.moveAmp || 0,
-                moveSpeed: options.moveSpeed || 1.5,
-                phase: options.phase || 0,
-                dx: 0, dy: 0, dz: 0
-            };
-            platforms.push(plat);
-            return plat;
+                top: y + h / 2,
+                bottom: y - h / 2,
+                minX: x - w / 2,
+                maxX: x + w / 2,
+                minZ: z - d / 2,
+                maxZ: z + d / 2
+            });
+            return mesh;
         }
-        function addCheckpoint(x, y, z, index) {
-            const group = new THREE.Group();
-            group.position.set(x, y, z);
 
-            const frameMat = createStuddedBlockMaterial(0x1e293b, 0.5, 0.1, 2, 2);
-            const frame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.18, 3.6), frameMat);
-            frame.position.y = 0.09;
-            frame.receiveShadow = true;
-            group.add(frame);
+        function addSafeRestFloor(x, y, z, w = 16, d = 14, colorHex = 0x38bdf8) {
+            addPlatform(x, y, z, w, 1.4, d, colorHex);
+            const railMat = getStuddedMaterial(0xf8fafc, 0.4);
+            const frontRail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, 0.35), railMat);
+            frontRail.position.set(x, y + 0.85, z + d / 2 - 0.2);
+            levelGroup.add(frontRail);
+        }
 
-            const padMat = new THREE.MeshStandardMaterial({
-                color: 0x38bdf8,
-                emissive: 0x0284c7,
-                emissiveIntensity: 0.65,
+        function addLavaBlock(x, y, z, w, d) {
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xff4500,
+                emissive: 0xea580c,
+                emissiveIntensity: 0.7,
                 roughness: 0.25
             });
-            const glowPad = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.22, 2.9), padMat);
-            glowPad.position.y = 0.12;
-            group.add(glowPad);
-
-            const flagPole = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.08, 0.08, 2.6, 10),
-                new THREE.MeshStandardMaterial({ color: 0xf8fafc })
-            );
-            flagPole.position.set(1.35, 1.3, -1.35);
-            group.add(flagPole);
-
-            const flagMat = new THREE.MeshStandardMaterial({
-                color: 0xf43f5e,
-                emissive: 0x881337,
-                emissiveIntensity: 0.35
-            });
-            const flag = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.56, 0.08), flagMat);
-            flag.position.set(1.82, 2.25, -1.35);
-            group.add(flag);
-
-            levelGroup.add(group);
-            checkpoints.push({
-                index,
-                x,
-                y: y + 0.25,
-                z,
-                reached: false,
-                flagMat,
-                padMat
-            });
-        }
-
-        function addLavaZone(x, y, z, w, h, d) {
-            const lavaTex = createLavaTexture();
-            lavaTex.repeat.set(Math.max(1.5, w / 2.2), Math.max(1.5, d / 2.2));
-            const mat = new THREE.MeshStandardMaterial({
-                map: lavaTex,
-                color: 0xff7043,
-                emissive: 0xff5722,
-                emissiveMap: lavaTex,
-                emissiveIntensity: 1.25,
-                roughness: 0.14,
-                metalness: 0.12
-            });
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.55, d), mat);
             mesh.position.set(x, y, z);
             levelGroup.add(mesh);
+
             lavaZones.push({
-                mesh,
-                tex: lavaTex,
-                baseY: y,
-                x, y, z, w, h, d
+                x, y, z,
+                halfW: w / 2,
+                halfD: d / 2,
+                top: y + 0.35
             });
-        }
-
-        function addLadder(x, y, z, w, h, d, color = 0xf59e0b) {
-            const mat = createStuddedBlockMaterial(color, 0.45, 0.08, 1, Math.max(1, Math.round(h / 2)));
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-            mesh.position.set(x, y, z);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            levelGroup.add(mesh);
-            ladders.push({ x, y, z, w, h, d });
         }
 
         function addSpinner(x, y, z, length = 7.5, speed = 1.6) {
             const pivot = new THREE.Group();
             pivot.position.set(x, y, z);
 
-            const hub = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.45, 0.45, 1.1, 14),
-                new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 })
+            const bar = new THREE.Mesh(
+                new THREE.BoxGeometry(length, 0.55, 0.65),
+                new THREE.MeshStandardMaterial({
+                    color: 0xef4444,
+                    emissive: 0xb91c1c,
+                    emissiveIntensity: 0.45
+                })
             );
-            pivot.add(hub);
-
-            const barMat = new THREE.MeshStandardMaterial({
-                color: 0xef4444,
-                emissive: 0x991b1b,
-                emissiveIntensity: 0.45,
-                roughness: 0.3
-            });
-            const bar = new THREE.Mesh(new THREE.BoxGeometry(length, 0.42, 0.42), barMat);
             pivot.add(bar);
-
             levelGroup.add(pivot);
-            spinners.push({
-                pivot,
-                x, y, z,
-                length,
-                thickness: 0.55,
-                speed,
-                angle: 0
-            });
+
+            spinners.push({ pivot, x, y, z, length, speed });
         }
 
         function addCoin(x, y, z) {
             const mesh = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.42, 0.42, 0.14, 16),
+                new THREE.CylinderGeometry(0.55, 0.55, 0.18, 16),
                 new THREE.MeshStandardMaterial({
                     color: 0xfacc15,
                     emissive: 0xca8a04,
-                    emissiveIntensity: 0.4,
-                    metalness: 0.35,
+                    emissiveIntensity: 0.35,
+                    metalness: 0.5,
                     roughness: 0.25
                 })
             );
-            mesh.rotation.z = Math.PI * 0.5;
+            mesh.rotation.x = Math.PI / 2;
             mesh.position.set(x, y, z);
             levelGroup.add(mesh);
-            coins.push({
-                mesh,
-                x, y, z,
-                baseY: y,
-                collected: false,
-                phase: Math.random() * Math.PI * 2
+            coins.push({ mesh, x, y, z, collected: false });
+        }
+
+        function addCheckpoint(x, y, z, label = 'CP') {
+            const pad = new THREE.Mesh(
+                new THREE.BoxGeometry(3.2, 0.25, 3.2),
+                new THREE.MeshStandardMaterial({
+                    color: 0x22c55e,
+                    emissive: 0x15803d,
+                    emissiveIntensity: 0.4
+                })
+            );
+            pad.position.set(x, y + 0.78, z);
+            levelGroup.add(pad);
+
+            checkpoints.push({
+                x, y: y + 0.9, z,
+                label,
+                activated: false,
+                pad
             });
         }
 
         function addPortal(x, y, z) {
-            portalPos = new THREE.Vector3(x, y + 1.4, z);
             const group = new THREE.Group();
-            group.position.set(x, y, z);
-
-            const base = new THREE.Mesh(
-                new THREE.CylinderGeometry(2.1, 2.3, 0.35, 24),
-                createStuddedBlockMaterial(0x1e293b, 0.4, 0.2, 2, 2)
-            );
-            base.position.y = 0.17;
-            base.receiveShadow = true;
-            group.add(base);
+            group.position.set(x, y + 2.2, z);
 
             const ring = new THREE.Mesh(
-                new THREE.TorusGeometry(1.55, 0.16, 14, 32),
+                new THREE.TorusGeometry(2.1, 0.26, 12, 28),
                 new THREE.MeshStandardMaterial({
-                    color: 0x38bdf8,
-                    emissive: 0x0284c7,
-                    emissiveIntensity: 0.8,
-                    roughness: 0.2
+                    color: 0xa855f7,
+                    emissive: 0x7e22ce,
+                    emissiveIntensity: 0.6
                 })
             );
-            ring.position.y = 1.85;
             group.add(ring);
 
             const core = new THREE.Mesh(
-                new THREE.CylinderGeometry(1.38, 1.38, 2.8, 24, 1, true),
+                new THREE.CircleGeometry(1.85, 24),
                 new THREE.MeshBasicMaterial({
-                    color: 0x22d3ee,
+                    color: 0x38bdf8,
                     transparent: true,
-                    opacity: 0.32,
+                    opacity: 0.72,
                     side: THREE.DoubleSide
                 })
             );
-            core.position.y = 1.85;
             group.add(core);
 
             levelGroup.add(group);
-            portalMesh = { group, ring, core };
+            portalMesh = core;
+            portalPos = new THREE.Vector3(x, y + 2.1, z);
         }
 
-        function buildRobloxPlayer() {
-            playerGroup = new THREE.Group();
+        function addAerialEnemy(kind, x, y, z, patrolRadius = 5.5, speed = 2.0) {
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
 
-            const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.5 });
-            const faceMat = new THREE.MeshStandardMaterial({ map: createRobloxFaceTexture(), roughness: 0.45 });
-            const shirtMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
-            const pantsMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.55 });
+            const isDragon = kind === 'dragon';
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: isDragon ? 0x991b1b : 0x78350f,
+                roughness: 0.45
+            });
+            const accentMat = new THREE.MeshStandardMaterial({
+                color: isDragon ? 0xf97316 : 0xfef08a,
+                emissive: isDragon ? 0xc2410c : 0x000000,
+                emissiveIntensity: isDragon ? 0.35 : 0,
+                roughness: 0.4
+            });
 
-            headMesh = new THREE.Mesh(
-                new THREE.BoxGeometry(0.66, 0.66, 0.66),
-                [skinMat, skinMat, skinMat, skinMat, faceMat, skinMat]
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 1.25 : 0.85, isDragon ? 0.95 : 0.7, isDragon ? 2.15 : 1.3),
+                bodyMat
             );
-            headMesh.position.y = 1.56;
-            headMesh.castShadow = true;
-            playerGroup.add(headMesh);
+            body.castShadow = true;
+            group.add(body);
 
-            torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.86, 0.44), shirtMat);
-            torsoMesh.position.y = 0.82;
-            torsoMesh.castShadow = true;
-            playerGroup.add(torsoMesh);
+            const head = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 0.85 : 0.65, isDragon ? 0.75 : 0.6, isDragon ? 0.95 : 0.75),
+                isDragon ? accentMat : bodyMat
+            );
+            head.position.set(0, 0.35, isDragon ? -1.35 : -0.85);
+            group.add(head);
 
-            leftArmPivot = new THREE.Group();
-            leftArmPivot.position.set(-0.56, 1.18, 0);
-            const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.82, 0.32), skinMat);
-            lArm.position.y = -0.34;
-            lArm.castShadow = true;
-            leftArmPivot.add(lArm);
-            playerGroup.add(leftArmPivot);
+            const leftWing = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75),
+                accentMat
+            );
+            leftWing.position.set(isDragon ? -1.5 : -1.2, 0.15, 0);
+            group.add(leftWing);
 
-            rightArmPivot = new THREE.Group();
-            rightArmPivot.position.set(0.56, 1.18, 0);
-            const rArm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.82, 0.32), skinMat);
-            rArm.position.y = -0.34;
-            rArm.castShadow = true;
-            rightArmPivot.add(rArm);
-            playerGroup.add(rightArmPivot);
+            const rightWing = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75),
+                accentMat
+            );
+            rightWing.position.set(isDragon ? 1.5 : 1.2, 0.15, 0);
+            group.add(rightWing);
 
-            leftLegPivot = new THREE.Group();
-            leftLegPivot.position.set(-0.21, 0.39, 0);
-            const lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.78, 0.38), pantsMat);
-            lLeg.position.y = -0.39;
-            lLeg.castShadow = true;
-            leftLegPivot.add(lLeg);
-            playerGroup.add(leftLegPivot);
-
-            rightLegPivot = new THREE.Group();
-            rightLegPivot.position.set(0.21, 0.39, 0);
-            const rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.78, 0.38), pantsMat);
-            rLeg.position.y = -0.39;
-            rLeg.castShadow = true;
-            rightLegPivot.add(rLeg);
-            playerGroup.add(rightLegPivot);
-
-            scene.add(playerGroup);
+            levelGroup.add(group);
+            aerialEnemies.push({
+                kind,
+                group,
+                leftWing,
+                rightWing,
+                baseX: x,
+                baseY: y,
+                baseZ: z,
+                patrolRadius,
+                speed,
+                hp: isDragon ? 2 : 1,
+                alive: true,
+                respawnTimer: 0,
+                fireCooldown: 1.4 + Math.random() * 1.2,
+                phase: Math.random() * Math.PI * 2
+            });
         }
 
-        function buildCircuitWall(minX, maxX, minZ, maxZ, lavaFloorY) {
-            const margin = 10;
-            const x0 = minX - margin;
-            const x1 = maxX + margin;
-            const z0 = minZ - margin;
-            const z1 = maxZ + margin;
+        function spawnPlayerShot() {
+            if (state.mode !== 'playing' || !player.pos) return;
+            sfxShoot();
 
-            const spanX = x1 - x0;
-            const spanZ = z1 - z0;
-            const cx = (x0 + x1) * 0.5;
-            const cz = (z0 + z1) * 0.5;
+            const dir = new THREE.Vector3(
+                -Math.sin(player.yaw),
+                0.1,
+                -Math.cos(player.yaw)
+            ).normalize();
 
-            const lavaTex = createLavaTexture();
-            const lavaMat = new THREE.MeshStandardMaterial({
-                map: lavaTex,
-                color: 0xff6d3b,
-                emissive: 0xff4500,
-                emissiveMap: lavaTex,
-                emissiveIntensity: 1.15,
-                roughness: 0.15,
-                metalness: 0.1
-            });
-            lavaWaveGeo = new THREE.PlaneGeometry(spanX + 160, spanZ + 160, 56, 56);
-            lavaWaveGeo.rotateX(-Math.PI * 0.5);
-            lavaWaveBasePos = new Float32Array(lavaWaveGeo.attributes.position.array);
+            let bestEnemy = null;
+            let bestDist = 28;
+            for (const en of aerialEnemies) {
+                if (!en.alive) continue;
+                const d = player.pos.distanceTo(en.group.position);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestEnemy = en;
+                }
+            }
+            if (bestEnemy) {
+                dir.copy(bestEnemy.group.position)
+                    .sub(new THREE.Vector3(player.pos.x, player.pos.y + 1.1, player.pos.z))
+                    .normalize();
+            }
 
-            lavaFloorMesh = new THREE.Mesh(lavaWaveGeo, lavaMat);
-            lavaFloorMesh.position.set(cx, lavaFloorY, cz);
-            sceneryGroup.add(lavaFloorMesh);
-
-            const crustMat = new THREE.MeshStandardMaterial({
-                color: 0x451a03,
-                roughness: 0.85
-            });
-            lavaCrustMesh = new THREE.Mesh(new THREE.PlaneGeometry(spanX + 160, spanZ + 160), crustMat);
-            lavaCrustMesh.rotation.x = -Math.PI * 0.5;
-            lavaCrustMesh.position.set(cx, lavaFloorY - 0.55, cz);
-            sceneryGroup.add(lavaCrustMesh);
-
-            const wallMat = new THREE.MeshStandardMaterial({
-                color: 0x334155,
-                transparent: true,
-                opacity: 0.14,
-                roughness: 0.6
-            });
-            const wallH = 16;
-            const wallThick = 1.2;
-
-            const northWall = new THREE.Mesh(new THREE.BoxGeometry(spanX, wallH, wallThick), wallMat);
-            northWall.position.set(cx, lavaFloorY + wallH * 0.5, z0);
-
-            const southWall = new THREE.Mesh(new THREE.BoxGeometry(spanX, wallH, wallThick), wallMat);
-            southWall.position.set(cx, lavaFloorY + wallH * 0.5, z1);
-
-            const westWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, spanZ), wallMat);
-            westWall.position.set(x0, lavaFloorY + wallH * 0.5, cz);
-
-            const eastWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, spanZ), wallMat);
-            eastWall.position.set(x1, lavaFloorY + wallH * 0.5, cz);
-
-            wallGroup.add(northWall, southWall, westWall, eastWall);
-            wallMeshes.push(
-                { minX: x0 - wallThick, maxX: x0 + wallThick, minZ: z0, maxZ: z1 },
-                { minX: x1 - wallThick, maxX: x1 + wallThick, minZ: z0, maxZ: z1 },
-                { minX: x0, maxX: x1, minZ: z0 - wallThick, maxZ: z0 + wallThick },
-                { minX: x0, maxX: x1, minZ: z1 - wallThick, maxZ: z1 + wallThick }
+            const shotMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.28, 0.28, 0.75),
+                new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
             );
+            shotMesh.position.set(player.pos.x, player.pos.y + 1.1, player.pos.z);
+            shotMesh.lookAt(shotMesh.position.clone().add(dir));
+            levelGroup.add(shotMesh);
+
+            playerShots.push({
+                mesh: shotMesh,
+                vel: dir.multiplyScalar(28),
+                life: 1.15
+            });
+        }
+
+        function spawnEnemyFireball(fromPos, targetPos) {
+            const dir = targetPos.clone().sub(fromPos).normalize();
+            const ball = new THREE.Mesh(
+                new THREE.SphereGeometry(0.36, 10, 10),
+                new THREE.MeshBasicMaterial({ color: 0xf97316 })
+            );
+            ball.position.copy(fromPos);
+            levelGroup.add(ball);
+
+            enemyFireballs.push({
+                mesh: ball,
+                vel: dir.multiplyScalar(11.5),
+                life: 3.0
+            });
         }
 
         function buildLevel(levelNum) {
             clearLevel();
-            const clamped = Math.min(TOTAL_LEVELS, Math.max(1, levelNum));
-            state.currentLevel = clamped;
+            const palette = [0xe2e8f0, 0x60a5fa, 0x34d399, 0xfbbf24, 0xc084fc, 0xf87171];
+            const mainColor = palette[(levelNum - 1) % palette.length];
+            const speedScale = 1 + (levelNum - 1) * 0.035;
 
-            const diff = (clamped - 1) / (TOTAL_LEVELS - 1);
-            const stageCount = 12 + (clamped % 5);
-            const palette = [0x3b82f6, 0x8b5cf6, 0x06b6d4, 0xec4899, 0x10b981, 0xf97316];
-            const baseColor = palette[clamped % palette.length];
-            const accentColor = palette[(clamped + 2) % palette.length];
+            addSafeRestFloor(0, 0, 0, 16, 15, 0xe2e8f0);
+            currentSpawn.set(0, 1.2, 2);
+            player.pos.copy(currentSpawn);
+            player.vel.set(0, 0, 0);
+            player.jumpsUsed = 0;
 
-            let cx = 0;
-            let cy = 0;
-            let cz = 0;
-            let minX = -6, maxX = 6, minZ = -6, maxZ = 6;
-            const lavaFloorY = -8.5;
+            let curX = 0;
+            let curY = 0;
+            let curZ = -10;
+            const obstacleCount = 6 + Math.floor(levelNum * 0.35);
 
-            addPlatform(cx, cy - 0.5, cz, 11.5, 1.0, 10.5, 0x475569);
-            player.spawn.set(cx, cy + 0.1, cz);
-            player.pos.copy(player.spawn);
-            if (player.vel) player.vel.set(0, 0, 0);
-            player.yaw = 0;
-            camCtrl.yaw = 0;
-            camCtrl.pitch = 0.34;
+            for (let i = 0; i < obstacleCount; i++) {
+                const zig = Math.sin(i * 1.15 + levelNum) * 3.2;
+                curX = zig;
+                curY = Math.max(0, curY + (i % 3 === 0 ? 0.55 : -0.25));
+                curZ -= 7.5;
 
-            for (let s = 1; s <= stageCount; s++) {
-                const gap = 3.2 + diff * 1.45 + ((s % 3) * 0.32);
-                const lateralShift = Math.sin(s * 1.35 + clamped * 0.7) * (1.8 + diff * 2.1);
-                const stepUp = (s % 4 === 0) ? (1.05 + diff * 0.35) : ((s % 5 === 0) ? -0.45 : 0);
+                const platW = Math.max(7.2, 10.5 - levelNum * 0.08);
+                const platD = Math.max(6.8, 9.2 - levelNum * 0.06);
+                addPlatform(curX, curY, curZ, platW, 1.2, platD, mainColor);
 
-                cx += lateralShift;
-                cy = Math.max(-1.0, cy + stepUp);
-                cz -= gap;
-
-                const pattern = (s + clamped) % 5;
-
-                if (pattern === 0) {
-                    const bridgeLen = 8.5 + diff * 2.5;
-                    const bridgeW = Math.max(3.1, 4.3 - diff * 1.0);
-                    addPlatform(cx, cy - 0.4, cz - bridgeLen * 0.5, bridgeW, 0.8, bridgeLen, baseColor, {
-                        moveAxis: s > 2 ? 'x' : null,
-                        moveAmp: s > 2 ? (1.1 + diff * 1.3) : 0,
-                        moveSpeed: 1.3 + diff * 1.1,
-                        phase: s * 0.9
-                    });
-                    if (s % 2 === 0) {
-                        addLavaZone(cx, cy + 0.06, cz - bridgeLen * 0.5, Math.min(2.1, bridgeW * 0.52), 0.18, 1.6);
-                    }
-                    addCoin(cx, cy + 1.2, cz - bridgeLen * 0.5);
-                    cz -= bridgeLen;
-                } else if (pattern === 1) {
-                    const stepCount = 3;
-                    for (let k = 0; k < stepCount; k++) {
-                        const sx = cx + Math.cos(k * 1.6 + s) * (1.5 + diff * 1.4);
-                        const sy = cy + k * 0.65;
-                        const sz = cz - (k + 1) * (3.1 + diff * 0.7);
-                        const sw = Math.max(2.6, 3.6 - diff * 0.8);
-                        addPlatform(sx, sy - 0.35, sz, sw, 0.7, 3.0, accentColor, {
-                            moveAxis: (k === 1 && s > 3) ? 'y' : null,
-                            moveAmp: (k === 1 && s > 3) ? 0.65 : 0,
-                            moveSpeed: 1.5 + diff,
-                            phase: k + s
-                        });
-                        if (k === 1) addCoin(sx, sy + 1.1, sz);
-                    }
-                    cz -= stepCount * (3.1 + diff * 0.7);
-                } else if (pattern === 2) {
-                    const deckLen = 9.0;
-                    const deckW = 6.2;
-                    addPlatform(cx, cy - 0.45, cz - deckLen * 0.5, deckW, 0.9, deckLen, 0x334155);
-                    addSpinner(cx, cy + 0.65, cz - deckLen * 0.5, Math.min(5.6, deckW - 0.5), 1.45 + diff * 1.35);
-                    addCoin(cx, cy + 1.4, cz - deckLen * 0.75);
-                    cz -= deckLen;
-                } else if (pattern === 3) {
-                    const towerH = 4.2;
-                    const towerW = 5.4;
-                    addPlatform(cx, cy + towerH * 0.5 - 0.5, cz - 2.6, towerW, towerH, 4.8, 0x475569);
-                    addLadder(cx, cy + towerH * 0.5 - 0.4, cz - 0.12, 1.3, towerH + 0.4, 0.35, 0xf59e0b);
-                    cy += towerH - 0.4;
-                    addCoin(cx, cy + 1.2, cz - 2.6);
-                    cz -= 4.8;
+                if (i % 2 === 1) {
+                    addSpinner(curX, curY + 1.05, curZ, Math.min(8.5, platW * 0.85), 1.45 * speedScale);
                 } else {
-                    const p1x = cx - 1.6;
-                    const p2x = cx + 1.6;
-                    const p1z = cz - 2.8;
-                    const p2z = cz - 6.2;
-                    addPlatform(p1x, cy - 0.35, p1z, 3.2, 0.7, 3.2, baseColor);
-                    addPlatform(p2x, cy - 0.35, p2z, 3.2, 0.7, 3.2, accentColor);
-                    addCoin(p1x, cy + 1.1, p1z);
-                    cz -= 7.8;
+                    addLavaBlock(curX + (i % 4 === 0 ? 1.5 : -1.5), curY + 0.65, curZ, 2.2, 2.2);
                 }
 
-                // Piso ancho y tranquilo intermedio cada pocas etapas para respirar y planificar el siguiente salto
-                if (s % 2 === 1 && s < stageCount) {
-                    addSafeRestPlatform(cx, cy - 0.5, cz - 3.2, 11.5, 9.0, 0x334155);
-                    cz -= 7.2;
+                addCoin(curX, curY + 1.8, curZ);
+
+                if (i % 2 === 0 || levelNum >= 3) {
+                    const useDragon = levelNum >= 4 && (i % 3 === 1 || levelNum >= 10);
+                    const kind = useDragon ? 'dragon' : (i % 2 === 0 ? 'eagle' : 'bird');
+                    addAerialEnemy(
+                        kind,
+                        curX,
+                        curY + (useDragon ? 4.6 : 3.4),
+                        curZ - 1.5,
+                        useDragon ? 6.5 : 4.8,
+                        (useDragon ? 1.75 : 2.2) * speedScale
+                    );
                 }
 
-                minX = Math.min(minX, cx - 8);
-                maxX = Math.max(maxX, cx + 8);
-                minZ = Math.min(minZ, cz - 8);
-                maxZ = Math.max(maxZ, cz + 8);
-
-                if (s % 4 === 0 && s < stageCount) {
-                    addSafeRestPlatform(cx, cy - 0.5, cz - 3.6, 12.5, 9.8, 0x1e293b);
-                    addCheckpoint(cx, cy, cz - 3.6, Math.floor(s / 4));
-                    cz -= 7.8;
+                if (i % 2 === 1 && i < obstacleCount - 1) {
+                    curZ -= 8.2;
+                    addSafeRestFloor(curX, curY, curZ, 15, 13, 0x38bdf8);
+                    addCheckpoint(curX, curY, curZ, `CP ${i + 1}`);
                 }
             }
 
-            cz -= 3.6;
-            addSafeRestPlatform(cx, cy - 0.5, cz - 4.0, 13.0, 11.0, 0x0f172a);
-            addPortal(cx, cy, cz - 4.2);
-
-            minX = Math.min(minX, cx - 10);
-            maxX = Math.max(maxX, cx + 10);
-            minZ = Math.min(minZ, cz - 10);
-            maxZ = Math.max(maxZ, cz + 10);
-
-            buildCircuitWall(minX, maxX, minZ, maxZ, lavaFloorY);
-            buildOpenWorldScenery(minX, maxX, minZ, maxZ, lavaFloorY);
-            initLavaSplashPool(minX, maxX, minZ, maxZ, lavaFloorY);
-            updateHud();
-            showToast(`Nivel ${clamped} (${stageCount} etapas) — ¡Llegada al portal!`, 2400);
+            curZ -= 9.0;
+            addSafeRestFloor(curX, curY, curZ, 16, 15, 0x22c55e);
+            addPortal(curX, curY + 0.7, curZ - 2.5);
         }
 
-        function respawnPlayer(reasonMsg = '¡Reapareciste en el checkpoint!') {
-            if (!player || !player.pos || !player.spawn) return;
-            player.pos.copy(player.spawn);
-            if (player.vel) player.vel.set(0, 0, 0);
-            player.onGround = false;
-            showToast(reasonMsg, 1600);
-        }
-
-        function completeCurrentLevel() {
-            const finishedLevel = state.currentLevel;
-            state.coins += 15 + finishedLevel * 2;
-            if (finishedLevel >= state.unlockedLevel && finishedLevel < TOTAL_LEVELS) {
-                state.unlockedLevel = finishedLevel + 1;
+        function respawnPlayer(byHazard = false) {
+            if (byHazard) sfxFail();
+            player.pos.copy(currentSpawn);
+            player.vel.set(0, 0, 0);
+            player.jumpsUsed = 0;
+            if (byHazard) {
+                showToast('¡Cuidado! Regresaste al último punto seguro', 1400);
             }
-            saveState();
-            updateHud();
-            sfxPortal();
+        }
 
-            if (finishedLevel < TOTAL_LEVELS) {
-                const nextLvl = finishedLevel + 1;
-                showToast(`¡Nivel ${finishedLevel} completado! Pasando al nivel ${nextLvl}...`, 2200);
-                setTimeout(() => {
-                    if (state.mode === 'playing') {
-                        buildLevel(nextLvl);
+        // ==========================================
+        // CONTROLES TÁCTILES INVISIBLES + TECLADO
+        // ==========================================
+        const input = {
+            keys: {},
+            joyActive: false,
+            joyTouchId: null,
+            joyOriginX: 0,
+            joyOriginY: 0,
+            joyVecX: 0,
+            joyVecY: 0,
+            camTouchId: null,
+            camLastX: 0,
+            camLastY: 0,
+            camMoved: false
+        };
+
+        function updateDynamicJoystickVisual(visible, ox = 0, oy = 0, kx = 0, ky = 0) {
+            const base = document.getElementById('dynamic-joy-base');
+            const knob = document.getElementById('dynamic-joy-knob');
+            if (!base || !knob) return;
+            if (!visible) {
+                base.style.display = 'none';
+                return;
+            }
+            base.style.display = 'block';
+            base.style.left = `${ox}px`;
+            base.style.top = `${oy}px`;
+            knob.style.left = `calc(50% + ${kx}px)`;
+            knob.style.top = `calc(50% + ${ky}px)`;
+        }
+
+        function triggerJump() {
+            if (state.mode !== 'playing') return;
+            if (player.onGround || player.jumpsUsed < player.maxJumps) {
+                player.vel.y = player.onGround ? 11.6 : 10.4;
+                player.onGround = false;
+                player.jumpsUsed += 1;
+                sfxJump();
+            }
+        }
+
+        function bindControls() {
+            window.addEventListener('keydown', (e) => {
+                input.keys[e.code] = true;
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    triggerJump();
+                } else if (e.code === 'KeyF' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                    e.preventDefault();
+                    spawnPlayerShot();
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                input.keys[e.code] = false;
+            });
+
+            const canvas = document.getElementById('game-canvas');
+            const maxRadius = 42;
+
+            canvas.addEventListener('touchstart', (e) => {
+                if (state.mode !== 'playing') return;
+                const halfW = window.innerWidth * 0.5;
+
+                for (const t of e.changedTouches) {
+                    if (t.clientX < halfW && !input.joyActive) {
+                        input.joyActive = true;
+                        input.joyTouchId = t.identifier;
+                        input.joyOriginX = t.clientX;
+                        input.joyOriginY = t.clientY;
+                        input.joyVecX = 0;
+                        input.joyVecY = 0;
+                        updateDynamicJoystickVisual(true, t.clientX, t.clientY, 0, 0);
+                    } else if (t.clientX >= halfW && input.camTouchId === null) {
+                        input.camTouchId = t.identifier;
+                        input.camLastX = t.clientX;
+                        input.camLastY = t.clientY;
+                        input.camMoved = false;
                     }
-                }, 450);
-            } else {
-                showToast('¡Completaste los 30 niveles de Obby 3D!', 3200);
-                setTimeout(() => {
-                    setMode('lobby');
-                }, 1400);
+                }
+            }, { passive: true });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (state.mode !== 'playing') return;
+                for (const t of e.changedTouches) {
+                    if (input.joyActive && t.identifier === input.joyTouchId) {
+                        let dx = t.clientX - input.joyOriginX;
+                        let dy = t.clientY - input.joyOriginY;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist > maxRadius) {
+                            dx = (dx / dist) * maxRadius;
+                            dy = (dy / dist) * maxRadius;
+                        }
+                        input.joyVecX = dx / maxRadius;
+                        input.joyVecY = dy / maxRadius;
+                        updateDynamicJoystickVisual(true, input.joyOriginX, input.joyOriginY, dx, dy);
+                    } else if (input.camTouchId === t.identifier) {
+                        const dx = t.clientX - input.camLastX;
+                        const dy = t.clientY - input.camLastY;
+                        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                            input.camMoved = true;
+                        }
+                        camCtrl.yaw -= dx * 0.0065;
+                        camCtrl.pitch = Math.max(0.12, Math.min(1.05, camCtrl.pitch + dy * 0.005));
+                        input.camLastX = t.clientX;
+                        input.camLastY = t.clientY;
+                    }
+                }
+            }, { passive: true });
+
+            const onTouchEnd = (e) => {
+                for (const t of e.changedTouches) {
+                    if (input.joyActive && t.identifier === input.joyTouchId) {
+                        input.joyActive = false;
+                        input.joyTouchId = null;
+                        input.joyVecX = 0;
+                        input.joyVecY = 0;
+                        updateDynamicJoystickVisual(false);
+                    } else if (input.camTouchId === t.identifier) {
+                        if (!input.camMoved && state.mode === 'playing') {
+                            triggerJump();
+                        }
+                        input.camTouchId = null;
+                    }
+                }
+            };
+
+            canvas.addEventListener('touchend', onTouchEnd, { passive: true });
+            canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+            let mouseDragging = false;
+            let lastMouseX = 0;
+            let lastMouseY = 0;
+            canvas.addEventListener('mousedown', (e) => {
+                mouseDragging = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!mouseDragging || state.mode !== 'playing') return;
+                const dx = e.clientX - lastMouseX;
+                const dy = e.clientY - lastMouseY;
+                camCtrl.yaw -= dx * 0.0055;
+                camCtrl.pitch = Math.max(0.12, Math.min(1.05, camCtrl.pitch + dy * 0.0045));
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            });
+            window.addEventListener('mouseup', () => {
+                mouseDragging = false;
+            });
+
+            document.getElementById('btn-play')?.addEventListener('click', () => {
+                ensureAudioContext();
+                buildLevel(state.currentLevel);
+                setMode('playing');
+            });
+            document.getElementById('btn-open-levels')?.addEventListener('click', openLevelsModal);
+            document.getElementById('btn-close-levels')?.addEventListener('click', closeLevelsModal);
+            document.getElementById('btn-hud-lobby')?.addEventListener('click', () => setMode('lobby'));
+            document.getElementById('btn-hud-levels')?.addEventListener('click', openLevelsModal);
+            document.getElementById('btn-hud-shoot')?.addEventListener('click', spawnPlayerShot);
+
+            const jumpToStage = (targetLvl) => {
+                const clamped = Math.max(1, Math.min(state.maxUnlockedLevel, targetLvl));
+                if (clamped === state.currentLevel) return;
+                state.currentLevel = clamped;
+                saveState();
+                buildLevel(clamped);
+                updateHud();
+                showToast(`Etapa ${clamped}`, 1100);
+            };
+            document.getElementById('btn-stage-first')?.addEventListener('click', () => jumpToStage(1));
+            document.getElementById('btn-stage-prev')?.addEventListener('click', () => jumpToStage(state.currentLevel - 1));
+            document.getElementById('btn-stage-next')?.addEventListener('click', () => jumpToStage(state.currentLevel + 1));
+            document.getElementById('btn-stage-max')?.addEventListener('click', () => jumpToStage(state.maxUnlockedLevel));
+
+            document.getElementById('btn-hud-sound')?.addEventListener('click', () => {
+                state.soundEnabled = !state.soundEnabled;
+                saveState();
+                updateHud();
+                if (state.soundEnabled && state.mode === 'playing') {
+                    startSuspenseMusic();
+                } else {
+                    stopSuspenseMusic();
+                }
+            });
+        }
+
+        // ==========================================
+        // SIMULACIÓN DEL MUNDO, JUGADOR Y CÁMARA
+        // ==========================================
+        function updateWorld(dt, elapsed) {
+            for (const sp of spinners) {
+                sp.pivot.rotation.y += sp.speed * dt;
+            }
+
+            for (const c of coins) {
+                if (c.collected) continue;
+                c.mesh.rotation.z += 2.6 * dt;
+                c.mesh.position.y = c.y + Math.sin(elapsed * 3.5 + c.x) * 0.2;
+            }
+
+            if (portalMesh) {
+                portalMesh.material.opacity = 0.62 + Math.sin(elapsed * 4.2) * 0.22;
+            }
+
+            for (const en of aerialEnemies) {
+                if (!en.alive) {
+                    en.respawnTimer -= dt;
+                    if (en.respawnTimer <= 0) {
+                        en.alive = true;
+                        en.hp = en.kind === 'dragon' ? 2 : 1;
+                        en.group.visible = true;
+                    }
+                    continue;
+                }
+
+                const t = elapsed * en.speed + en.phase;
+                const nextX = en.baseX + Math.cos(t) * en.patrolRadius;
+                const diveY = en.kind === 'eagle' ? Math.sin(t * 2) * 1.15 : Math.sin(t * 1.5) * 0.55;
+                const nextY = en.baseY + diveY;
+                const nextZ = en.baseZ + Math.sin(t) * (en.patrolRadius * 0.55);
+
+                en.group.lookAt(nextX, nextY, nextZ);
+                en.group.position.set(nextX, nextY, nextZ);
+
+                const flap = Math.sin(elapsed * 14 + en.phase) * 0.65;
+                en.leftWing.rotation.z = flap;
+                en.rightWing.rotation.z = -flap;
+
+                if (en.kind === 'dragon' && state.mode === 'playing') {
+                    const distToPlayer = en.group.position.distanceTo(player.pos);
+                    if (distToPlayer < 24) {
+                        en.fireCooldown -= dt;
+                        if (en.fireCooldown <= 0) {
+                            en.fireCooldown = 2.3;
+                            spawnEnemyFireball(
+                                en.group.position.clone(),
+                                new THREE.Vector3(player.pos.x, player.pos.y + 1.0, player.pos.z)
+                            );
+                        }
+                    }
+                }
+            }
+
+            for (let i = playerShots.length - 1; i >= 0; i--) {
+                const shot = playerShots[i];
+                shot.life -= dt;
+                shot.mesh.position.addScaledVector(shot.vel, dt);
+
+                let hit = false;
+                for (const en of aerialEnemies) {
+                    if (!en.alive) continue;
+                    if (shot.mesh.position.distanceTo(en.group.position) < 1.55) {
+                        en.hp -= 1;
+                        hit = true;
+                        if (en.hp <= 0) {
+                            en.alive = false;
+                            en.group.visible = false;
+                            en.respawnTimer = 6.5;
+                            state.coins += 2;
+                            saveState();
+                            updateHud();
+                            sfxEnemyDown();
+                            showToast(en.kind === 'dragon' ? '🐉 ¡Dragón derribado! +2 monedas' : '🦅 ¡Ave derribada! +2 monedas', 1400);
+                        } else {
+                            sfxShoot();
+                        }
+                        break;
+                    }
+                }
+
+                if (hit || shot.life <= 0) {
+                    levelGroup.remove(shot.mesh);
+                    playerShots.splice(i, 1);
+                }
+            }
+
+            for (let i = enemyFireballs.length - 1; i >= 0; i--) {
+                const ball = enemyFireballs[i];
+                ball.life -= dt;
+                ball.mesh.position.addScaledVector(ball.vel, dt);
+
+                if (state.mode === 'playing') {
+                    const pCenter = new THREE.Vector3(player.pos.x, player.pos.y + 0.95, player.pos.z);
+                    if (ball.mesh.position.distanceTo(pCenter) < 1.05) {
+                        levelGroup.remove(ball.mesh);
+                        enemyFireballs.splice(i, 1);
+                        respawnPlayer(true);
+                        continue;
+                    }
+                }
+
+                if (ball.life <= 0) {
+                    levelGroup.remove(ball.mesh);
+                    enemyFireballs.splice(i, 1);
+                }
             }
         }
 
-        function updateHazardsAndPickups(dt, elapsed) {
-            if (!player || !player.pos) return;
+        function updatePlayer(dt, elapsed) {
+            if (!player.root) return;
 
-            if (lavaFloorMesh && lavaFloorMesh.material && lavaFloorMesh.material.map) {
-                lavaFloorMesh.material.map.offset.x = elapsed * 0.085;
-                lavaFloorMesh.material.map.offset.y = Math.sin(elapsed * 0.6) * 0.04 + elapsed * 0.055;
+            if (state.mode !== 'playing') {
+                player.root.position.copy(player.pos);
+                player.root.rotation.y = elapsed * 0.5;
+                return;
             }
 
-            // Ondulación fluida del mar de lava
-            if (lavaWaveGeo && lavaWaveBasePos) {
-                const posAttr = lavaWaveGeo.attributes.position;
-                const arr = posAttr.array;
-                for (let i = 0; i < arr.length; i += 3) {
-                    const bx = lavaWaveBasePos[i];
-                    const bz = lavaWaveBasePos[i + 2];
-                    const wave =
-                        Math.sin(bx * 0.075 + elapsed * 2.1) * 0.28 +
-                        Math.cos(bz * 0.085 - elapsed * 1.75) * 0.24 +
-                        Math.sin((bx + bz) * 0.045 + elapsed * 1.4) * 0.16;
-                    arr[i + 1] = lavaWaveBasePos[i + 1] + wave;
+            let moveX = input.joyActive ? input.joyVecX : 0;
+            let moveZ = input.joyActive ? input.joyVecY : 0;
+
+            if (input.keys['KeyA'] || input.keys['ArrowLeft']) moveX -= 1;
+            if (input.keys['KeyD'] || input.keys['ArrowRight']) moveX += 1;
+            if (input.keys['KeyW'] || input.keys['ArrowUp']) moveZ -= 1;
+            if (input.keys['KeyS'] || input.keys['ArrowDown']) moveZ += 1;
+
+            const len = Math.hypot(moveX, moveZ);
+            if (len > 1) {
+                moveX /= len;
+                moveZ /= len;
+            }
+
+            const forward = new THREE.Vector3(-Math.sin(camCtrl.yaw), 0, -Math.cos(camCtrl.yaw));
+            const right = new THREE.Vector3(Math.cos(camCtrl.yaw), 0, -Math.sin(camCtrl.yaw));
+
+            const wishDir = new THREE.Vector3()
+                .addScaledVector(right, moveX)
+                .addScaledVector(forward, -moveZ);
+
+            const moveSpeed = 8.4;
+            player.vel.x = wishDir.x * moveSpeed;
+            player.vel.z = wishDir.z * moveSpeed;
+            player.vel.y -= 26.5 * dt;
+
+            const prevY = player.pos.y;
+            player.pos.addScaledVector(player.vel, dt);
+
+            if (wishDir.lengthSq() > 0.001) {
+                const targetYaw = Math.atan2(-wishDir.x, -wishDir.z);
+                player.yaw = targetYaw;
+                player.root.rotation.y = targetYaw;
+            }
+
+            player.onGround = false;
+            for (const p of platforms) {
+                const withinXZ =
+                    player.pos.x + 0.42 >= p.minX &&
+                    player.pos.x - 0.42 <= p.maxX &&
+                    player.pos.z + 0.42 >= p.minZ &&
+                    player.pos.z - 0.42 <= p.maxZ;
+
+                if (withinXZ && player.vel.y <= 0 && prevY >= p.top - 0.25 && player.pos.y <= p.top) {
+                    player.pos.y = p.top;
+                    player.vel.y = 0;
+                    player.onGround = true;
+                    player.jumpsUsed = 0;
                 }
-                posAttr.needsUpdate = true;
-                lavaWaveGeo.computeVertexNormals();
             }
 
-            updateLavaSplashes(dt);
+            if (player.pos.y < -12.5) {
+                respawnPlayer(true);
+                return;
+            }
 
             for (const lz of lavaZones) {
-                if (lz.tex) {
-                    lz.tex.offset.x = elapsed * 0.24;
-                    lz.tex.offset.y = -elapsed * 0.19;
-                }
-                if (lz.mesh && typeof lz.baseY === 'number') {
-                    lz.mesh.position.y = lz.baseY + Math.sin(elapsed * 3.2 + lz.x) * 0.05;
-                }
-                const halfW = lz.w * 0.5 + player.radius * 0.65;
-                const halfD = lz.d * 0.5 + player.radius * 0.65;
-                const withinX = Math.abs(player.pos.x - lz.x) <= halfW;
-                const withinZ = Math.abs(player.pos.z - lz.z) <= halfD;
-                const withinY = player.pos.y <= lz.y + lz.h * 0.5 + 0.35 && player.pos.y + player.height >= lz.y - lz.h * 0.5;
-                if (withinX && withinZ && withinY) {
-                    sfxLava();
-                    respawnPlayer('¡Tocaste un bloque de lava!');
+                if (
+                    Math.abs(player.pos.x - lz.x) <= lz.halfW + 0.3 &&
+                    Math.abs(player.pos.z - lz.z) <= lz.halfD + 0.3 &&
+                    player.pos.y <= lz.top &&
+                    player.pos.y >= lz.top - 1.1
+                ) {
+                    respawnPlayer(true);
                     return;
                 }
             }
 
             for (const sp of spinners) {
-                sp.angle += sp.speed * dt;
-                sp.pivot.rotation.y = sp.angle;
+                if (Math.abs(player.pos.y - sp.y) < 1.2) {
+                    const angle = sp.pivot.rotation.y;
+                    const cosA = Math.cos(-angle);
+                    const sinA = Math.sin(-angle);
+                    const relX = player.pos.x - sp.x;
+                    const relZ = player.pos.z - sp.z;
+                    const localX = relX * cosA - relZ * sinA;
+                    const localZ = relX * sinA + relZ * cosA;
+                    if (Math.abs(localX) <= sp.length / 2 + 0.25 && Math.abs(localZ) <= 0.48) {
+                        respawnPlayer(true);
+                        return;
+                    }
+                }
+            }
 
-                const cosA = Math.cos(sp.angle);
-                const sinA = Math.sin(sp.angle);
-                const relX = player.pos.x - sp.x;
-                const relZ = player.pos.z - sp.z;
-
-                const localAlong = relX * cosA - relZ * sinA;
-                const localPerp = relX * sinA + relZ * cosA;
-                const withinY = Math.abs((player.pos.y + 0.85) - sp.y) <= 0.85;
-
-                if (
-                    withinY &&
-                    Math.abs(localAlong) <= sp.length * 0.5 + player.radius * 0.5 &&
-                    Math.abs(localPerp) <= sp.thickness * 0.5 + player.radius * 0.55
-                ) {
-                    sfxLava();
-                    respawnPlayer('¡Te golpeó el rodillo giratorio!');
+            for (const en of aerialEnemies) {
+                if (!en.alive) continue;
+                const pCenter = new THREE.Vector3(player.pos.x, player.pos.y + 0.95, player.pos.z);
+                if (pCenter.distanceTo(en.group.position) < 1.35) {
+                    respawnPlayer(true);
                     return;
+                }
+            }
+
+            for (const cp of checkpoints) {
+                if (cp.activated) continue;
+                if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 2.6) {
+                    cp.activated = true;
+                    currentSpawn.set(cp.x, cp.y + 0.4, cp.z);
+                    cp.pad.material.color.setHex(0xfacc15);
+                    sfxCheckpoint();
+                    showToast(`¡${cp.label} activado!`, 1300);
                 }
             }
 
             for (const c of coins) {
                 if (c.collected) continue;
-                c.mesh.rotation.y += 2.6 * dt;
-                c.mesh.position.y = c.baseY + Math.sin(elapsed * 3.5 + c.phase) * 0.16;
-
-                const dist = Math.hypot(player.pos.x - c.x, player.pos.z - c.z, (player.pos.y + 0.9) - c.mesh.position.y);
-                if (dist <= 1.15) {
+                if (player.pos.distanceTo(new THREE.Vector3(c.x, c.y, c.z)) < 1.65) {
                     c.collected = true;
                     c.mesh.visible = false;
                     state.coins += 1;
@@ -1384,533 +1596,84 @@
                 }
             }
 
-            if (portalMesh) {
-                portalMesh.ring.rotation.z += 1.4 * dt;
-                portalMesh.core.rotation.y -= 1.8 * dt;
-            }
-
-            if (portalPos) {
-                const pDist = Math.hypot(player.pos.x - portalPos.x, player.pos.z - portalPos.z, player.pos.y - (portalPos.y - 1.4));
-                if (pDist <= 2.25) {
-                    completeCurrentLevel();
-                }
-            }
-        }
-
-        // =========================================================================
-        // CONTROLES (TECLADO, JOYSTICK TÁCTIL Y CÁMARA)
-        // =========================================================================
-        const keys = { w: false, a: false, s: false, d: false, space: false };
-        const joyVec = { x: 0, y: 0 };
-        let joyPointerId = null;
-        let camPointerId = null;
-        let lastCamX = 0;
-        let lastCamY = 0;
-        let jumpPressed = false;
-
-        function resetJoystickKnob() {
-            joyPointerId = null;
-            joyVec.x = 0;
-            joyVec.y = 0;
-            const knob = document.getElementById('joystick-knob');
-            if (knob) {
-                knob.style.transform = 'translate(0px, 0px)';
-            }
-        }
-
-        function triggerJump() {
-            if (!player || !player.vel) return;
-            if (player.onGround) {
-                player.vel.y = 12.2;
-                player.onGround = false;
-                sfxJump();
-            }
-        }
-
-        function bindControls() {
-            window.addEventListener('keydown', (e) => {
-                const k = e.key.toLowerCase();
-                if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
-                if (k === 's' || e.key === 'ArrowDown') keys.s = true;
-                if (k === 'a' || e.key === 'ArrowLeft') keys.a = true;
-                if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
-                if (e.code === 'Space' || k === ' ') {
-                    keys.space = true;
-                    if (state.mode === 'playing') triggerJump();
-                }
-            });
-
-            window.addEventListener('keyup', (e) => {
-                const k = e.key.toLowerCase();
-                if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
-                if (k === 's' || e.key === 'ArrowDown') keys.s = false;
-                if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
-                if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
-                if (e.code === 'Space' || k === ' ') keys.space = false;
-            });
-
-            const joyZone = document.getElementById('joystick-zone');
-            const knob = document.getElementById('joystick-knob');
-            const maxRadius = 38;
-
-            if (joyZone) {
-                joyZone.addEventListener('pointerdown', (e) => {
-                    e.stopPropagation();
-                    joyPointerId = e.pointerId;
-                    joyZone.setPointerCapture(e.pointerId);
-                    updateJoystickFromEvent(e);
-                });
-
-                joyZone.addEventListener('pointermove', (e) => {
-                    if (e.pointerId !== joyPointerId) return;
-                    e.stopPropagation();
-                    updateJoystickFromEvent(e);
-                });
-
-                const endJoy = (e) => {
-                    if (e.pointerId !== joyPointerId) return;
-                    e.stopPropagation();
-                    resetJoystickKnob();
-                };
-                joyZone.addEventListener('pointerup', endJoy);
-                joyZone.addEventListener('pointercancel', endJoy);
-            }
-
-            function updateJoystickFromEvent(e) {
-                if (!joyZone || !knob) return;
-                const rect = joyZone.getBoundingClientRect();
-                const cx = rect.left + rect.width * 0.5;
-                const cy = rect.top + rect.height * 0.5;
-                let dx = e.clientX - cx;
-                let dy = e.clientY - cy;
-                const dist = Math.hypot(dx, dy);
-                if (dist > maxRadius) {
-                    dx = (dx / dist) * maxRadius;
-                    dy = (dy / dist) * maxRadius;
-                }
-                knob.style.transform = `translate(${dx}px, ${dy}px)`;
-                joyVec.x = dx / maxRadius;
-                joyVec.y = dy / maxRadius;
-            }
-
-            const jumpBtn = document.getElementById('jump-btn');
-            if (jumpBtn) {
-                jumpBtn.addEventListener('pointerdown', (e) => {
-                    e.stopPropagation();
-                    jumpPressed = true;
-                    triggerJump();
-                });
-                const releaseJump = (e) => {
-                    e.stopPropagation();
-                    jumpPressed = false;
-                };
-                jumpBtn.addEventListener('pointerup', releaseJump);
-                jumpBtn.addEventListener('pointercancel', releaseJump);
-            }
-
-            const canvas = document.getElementById('game-canvas');
-            if (canvas) {
-                canvas.addEventListener('pointerdown', (e) => {
-                    if (state.mode !== 'playing') return;
-                    if (camPointerId !== null) return;
-                    camPointerId = e.pointerId;
-                    lastCamX = e.clientX;
-                    lastCamY = e.clientY;
-                });
-
-                window.addEventListener('pointermove', (e) => {
-                    if (e.pointerId !== camPointerId) return;
-                    const dx = e.clientX - lastCamX;
-                    const dy = e.clientY - lastCamY;
-                    lastCamX = e.clientX;
-                    lastCamY = e.clientY;
-
-                    camCtrl.yaw -= dx * 0.0065;
-                    camCtrl.pitch = Math.max(0.12, Math.min(1.15, camCtrl.pitch + dy * 0.0055));
-                });
-
-                const endCam = (e) => {
-                    if (e.pointerId === camPointerId) {
-                        camPointerId = null;
+            if (portalPos && player.pos.distanceTo(portalPos) < 2.6) {
+                sfxPortal();
+                if (state.currentLevel < TOTAL_LEVELS) {
+                    const nextLvl = state.currentLevel + 1;
+                    state.currentLevel = nextLvl;
+                    if (nextLvl > state.maxUnlockedLevel) {
+                        state.maxUnlockedLevel = nextLvl;
                     }
-                };
-                window.addEventListener('pointerup', endCam);
-                window.addEventListener('pointercancel', endCam);
-            }
-        }
-
-        function updatePlayer(dt, elapsed) {
-            if (!player || !player.pos || !player.vel) return;
-            if (state.mode !== 'playing') {
-                if (playerGroup) {
-                    playerGroup.position.copy(player.pos);
-                    playerGroup.rotation.y = Math.sin(elapsed * 0.9) * 0.35;
+                    saveState();
+                    updateHud();
+                    buildLevel(nextLvl);
+                    showToast(`¡Etapa superada! Pasaste a la Etapa ${nextLvl}`, 2000);
+                } else {
+                    showToast('🏆 ¡Completaste las 30 etapas del Obby Aéreo!', 2600);
+                    state.currentLevel = 1;
+                    saveState();
+                    buildLevel(1);
                 }
-                updateHazardsAndPickups(dt, elapsed);
                 return;
             }
 
-            for (const p of platforms) {
-                p.dx = 0;
-                p.dy = 0;
-                p.dz = 0;
-                if (p.moveAxis === 'x') {
-                    const nextX = p.baseX + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
-                    p.dx = nextX - p.x;
-                    p.x = nextX;
-                } else if (p.moveAxis === 'y') {
-                    const nextY = p.baseY + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
-                    p.dy = nextY - p.y;
-                    p.y = nextY;
-                } else if (p.moveAxis === 'z') {
-                    const nextZ = p.baseZ + Math.sin(elapsed * p.moveSpeed + p.phase) * p.moveAmp;
-                    p.dz = nextZ - p.z;
-                    p.z = nextZ;
-                }
-                p.mesh.position.set(p.x, p.y, p.z);
-            }
-
-            let moveX = joyVec.x;
-            let moveZ = joyVec.y;
-            if (keys.a) moveX -= 1;
-            if (keys.d) moveX += 1;
-            if (keys.w) moveZ -= 1;
-            if (keys.s) moveZ += 1;
-
-            const mag = Math.hypot(moveX, moveZ);
-            if (mag > 1) {
-                moveX /= mag;
-                moveZ /= mag;
-            }
-
-            const sinY = Math.sin(camCtrl.yaw);
-            const cosY = Math.cos(camCtrl.yaw);
-            const wishX = moveX * cosY + moveZ * sinY;
-            const wishZ = -moveX * sinY + moveZ * cosY;
-
-            const speed = 7.4;
-            player.vel.x = wishX * speed;
-            player.vel.z = wishZ * speed;
-
-            let onLadder = false;
-            for (const ld of ladders) {
-                const withinX = Math.abs(player.pos.x - ld.x) <= ld.w * 0.5 + player.radius + 0.25;
-                const withinZ = Math.abs(player.pos.z - ld.z) <= ld.d * 0.5 + player.radius + 0.25;
-                const withinY = player.pos.y >= ld.y - ld.h * 0.5 - 0.5 && player.pos.y <= ld.y + ld.h * 0.5 + 0.6;
-                if (withinX && withinZ && withinY) {
-                    onLadder = true;
-                    break;
+            const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
+            if (player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
+                if (player.onGround && horizSpeed > 0.6) {
+                    player.walkCycle += dt * 11;
+                    const swing = Math.sin(player.walkCycle) * 0.65;
+                    player.leftLeg.rotation.x = swing;
+                    player.rightLeg.rotation.x = -swing;
+                    player.leftArm.rotation.x = -swing * 0.7;
+                    player.rightArm.rotation.x = swing * 0.7;
+                } else {
+                    player.leftLeg.rotation.x = 0;
+                    player.rightLeg.rotation.x = 0;
+                    player.leftArm.rotation.x = player.onGround ? 0 : -0.45;
+                    player.rightArm.rotation.x = player.onGround ? 0 : -0.45;
                 }
             }
 
-            if (onLadder && (mag > 0.1 || keys.space || jumpPressed)) {
-                player.vel.y = 7.2;
-                player.onGround = true;
-            } else {
-                if ((keys.space || jumpPressed) && player.onGround) {
-                    triggerJump();
-                }
-                player.vel.y -= 28.0 * dt;
-            }
-
-            const prevY = player.pos.y;
-            player.pos.x += player.vel.x * dt;
-            player.pos.y += player.vel.y * dt;
-            player.pos.z += player.vel.z * dt;
-
-            let groundedNow = false;
-            for (const p of platforms) {
-                const topY = p.y + p.h * 0.5;
-                const botY = p.y - p.h * 0.5;
-                const halfW = p.w * 0.5 + player.radius * 0.75;
-                const halfD = p.d * 0.5 + player.radius * 0.75;
-
-                const withinX = Math.abs(player.pos.x - p.x) <= halfW;
-                const withinZ = Math.abs(player.pos.z - p.z) <= halfD;
-
-                if (withinX && withinZ && player.vel.y <= 0 && prevY >= topY - 0.35 && player.pos.y <= topY + 0.08) {
-                    player.pos.y = topY;
-                    player.pos.x += p.dx;
-                    player.pos.z += p.dz;
-                    player.vel.y = 0;
-                    groundedNow = true;
-                } else if (withinX && withinZ && player.pos.y + player.height >= botY && prevY + player.height <= botY + 0.35 && player.vel.y > 0) {
-                    player.pos.y = botY - player.height;
-                    player.vel.y = 0;
-                }
-            }
-
-            for (const wm of wallMeshes) {
-                if (
-                    player.pos.x + player.radius > wm.minX &&
-                    player.pos.x - player.radius < wm.maxX &&
-                    player.pos.z + player.radius > wm.minZ &&
-                    player.pos.z - player.radius < wm.maxZ
-                ) {
-                    player.pos.x -= player.vel.x * dt;
-                    player.pos.z -= player.vel.z * dt;
-                }
-            }
-
-            for (const cp of checkpoints) {
-                if (cp.reached) continue;
-                const dx = Math.abs(player.pos.x - cp.x);
-                const dz = Math.abs(player.pos.z - cp.z);
-                const dy = Math.abs(player.pos.y - cp.y);
-                if (dx <= 1.8 && dz <= 1.8 && dy <= 1.6) {
-                    cp.reached = true;
-                    cp.flagMat.color.setHex(0x22c55e);
-                    cp.flagMat.emissive.setHex(0x14532d);
-                    if (cp.padMat) {
-                        cp.padMat.color.setHex(0x4ade80);
-                        cp.padMat.emissive.setHex(0x15803d);
-                    }
-                    player.spawn.set(cp.x, cp.y + 0.1, cp.z);
-                    sfxCheckpoint();
-                    showToast(`¡Checkpoint ${cp.index} guardado!`, 1500);
-                }
-            }
-
-            player.onGround = groundedNow;
-
-            if (mag > 0.08) {
-                const targetYaw = Math.atan2(wishX, wishZ);
-                let diffYaw = targetYaw - player.yaw;
-                while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
-                while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
-                player.yaw += diffYaw * Math.min(1, dt * 14);
-                player.walkCycle += dt * 11;
-            } else {
-                player.walkCycle = 0;
-            }
-
-            if (playerGroup) {
-                playerGroup.position.copy(player.pos);
-                playerGroup.rotation.y = player.yaw;
-
-                const swing = player.onGround ? Math.sin(player.walkCycle) * 0.65 : 0.35;
-                if (leftLegPivot) leftLegPivot.rotation.x = swing;
-                if (rightLegPivot) rightLegPivot.rotation.x = -swing;
-                if (leftArmPivot) leftArmPivot.rotation.x = -swing * 0.8;
-                if (rightArmPivot) rightArmPivot.rotation.x = swing * 0.8;
-            }
-
-            if (player.pos.y < -8.2) {
-                respawnPlayer('¡Caíste a la lava!');
-                return;
-            }
-
-            updateHazardsAndPickups(dt, elapsed);
-            updateHudDistance();
+            player.root.position.copy(player.pos);
         }
 
         function updateCamera() {
-            if (!camera || !player || !player.pos) return;
-            const targetX = player.pos.x;
-            const targetY = player.pos.y + 1.65;
-            const targetZ = player.pos.z;
-
+            if (!camera) return;
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.1, player.pos.z);
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
             const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
 
-            const camX = targetX + Math.sin(camCtrl.yaw) * horizDist;
-            const camY = targetY + vertDist;
-            const camZ = targetZ + Math.cos(camCtrl.yaw) * horizDist;
+            const desiredPos = new THREE.Vector3(
+                target.x + Math.sin(camCtrl.yaw) * horizDist,
+                target.y + vertDist,
+                target.z + Math.cos(camCtrl.yaw) * horizDist
+            );
 
-            camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.22);
-            camera.lookAt(targetX, targetY, targetZ);
+            camera.position.lerp(desiredPos, 0.14);
+            camera.lookAt(target);
         }
 
-        // =========================================================================
-        // INTERFAZ DE USUARIO, LOBBY Y SELECTOR DE 30 NIVELES
-        // =========================================================================
-        function updateHudDistance() {
-            const el = document.getElementById('hud-distance');
-            if (!el || !portalPos || !player || !player.pos) return;
-            const dist = Math.max(0, Math.round(Math.hypot(portalPos.x - player.pos.x, portalPos.z - player.pos.z)));
-            el.textContent = `${dist}m`;
-        }
-
-        function updateHud() {
-            const hudLevel = document.getElementById('hud-level');
-            const hudCoins = document.getElementById('hud-coins');
-            const lobbyUnlocked = document.getElementById('lobby-unlocked');
-            const lobbyCoins = document.getElementById('lobby-coins');
-            const soundBtnLobby = document.getElementById('btn-toggle-sound');
-            const soundBtnHud = document.getElementById('btn-hud-sound');
-
-            if (hudLevel) hudLevel.textContent = `${state.currentLevel} / ${TOTAL_LEVELS}`;
-            if (hudCoins) hudCoins.textContent = `${state.coins}`;
-            if (lobbyUnlocked) lobbyUnlocked.textContent = `${state.currentLevel} / ${TOTAL_LEVELS}`;
-            if (lobbyCoins) lobbyCoins.textContent = `🪙 ${state.coins}`;
-
-            if (soundBtnLobby) {
-                soundBtnLobby.textContent = state.soundEnabled
-                    ? '🔊 Sonido y Música: Activado'
-                    : '🔇 Sonido y Música: Silenciado';
-            }
-            if (soundBtnHud) {
-                soundBtnHud.textContent = state.soundEnabled ? '🔊' : '🔇';
-            }
-        }
-
-        function renderLevelsModal() {
-            const grid = document.getElementById('levels-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
-
-            for (let lvl = 1; lvl <= TOTAL_LEVELS; lvl++) {
-                const isUnlocked = lvl <= state.unlockedLevel;
-                const isCurrent = lvl === state.currentLevel;
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.disabled = !isUnlocked;
-                btn.textContent = isUnlocked ? `${lvl}` : `🔒 ${lvl}`;
-                btn.className = [
-                    'py-2.5 rounded-xl font-black text-xs sm:text-sm border transition',
-                    !isUnlocked
-                        ? 'bg-slate-900/70 text-slate-500 border-white/5 cursor-not-allowed opacity-60'
-                        : isCurrent
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-200 shadow-md active:scale-95'
-                            : 'bg-slate-800 hover:bg-slate-700 text-white border-white/10 active:scale-95'
-                ].join(' ');
-
-                if (isUnlocked) {
-                    btn.addEventListener('click', () => {
-                        state.currentLevel = lvl;
-                        saveState();
-                        closeLevelsModal();
-                        setMode('playing');
-                        buildLevel(lvl);
-                    });
-                }
-                grid.appendChild(btn);
-            }
-        }
-
-        function openLevelsModal() {
-            renderLevelsModal();
-            const modal = document.getElementById('level-modal');
-            if (modal) modal.classList.remove('hidden');
-        }
-
-        function closeLevelsModal() {
-            const modal = document.getElementById('level-modal');
-            if (modal) modal.classList.add('hidden');
-        }
-
-        function setMode(newMode) {
-            state.mode = newMode;
-            const lobby = document.getElementById('lobby-screen');
-            const hud = document.getElementById('game-hud');
-            const joy = document.getElementById('joystick-zone');
-            const jump = document.getElementById('jump-btn');
-
-            if (newMode === 'playing') {
-                if (lobby) lobby.classList.add('hidden');
-                if (hud) hud.classList.remove('hidden');
-                if (joy) joy.classList.remove('hidden');
-                if (jump) jump.classList.remove('hidden');
-                if (state.soundEnabled) startBgm();
-            } else {
-                resetJoystickKnob();
-                jumpPressed = false;
-                if (lobby) lobby.classList.remove('hidden');
-                if (hud) hud.classList.add('hidden');
-                if (joy) joy.classList.add('hidden');
-                if (jump) jump.classList.add('hidden');
-            }
-            updateHud();
-        }
-
-        function toggleSound() {
-            state.soundEnabled = !state.soundEnabled;
-            saveState();
-            if (state.soundEnabled) {
-                getAudioCtx();
-                startBgm();
-                showToast('Sonido y música activados', 1400);
-            } else {
-                showToast('Sonido silenciado', 1400);
-            }
-            updateHud();
-        }
-
-        function bindMenuEvents() {
-            const btnPlay = document.getElementById('btn-play');
-            const btnSelect = document.getElementById('btn-select-level');
-            const btnToggleSound = document.getElementById('btn-toggle-sound');
-            const btnCloseLevels = document.getElementById('btn-close-levels');
-            const btnHudBack = document.getElementById('btn-hud-back');
-            const btnHudLevels = document.getElementById('btn-hud-levels');
-            const btnHudSound = document.getElementById('btn-hud-sound');
-            const btnHudLobby = document.getElementById('btn-hud-lobby');
-
-            if (btnPlay) {
-                btnPlay.addEventListener('click', () => {
-                    setMode('playing');
-                    buildLevel(state.currentLevel);
-                });
-            }
-            if (btnSelect) btnSelect.addEventListener('click', openLevelsModal);
-            if (btnToggleSound) btnToggleSound.addEventListener('click', toggleSound);
-            if (btnCloseLevels) btnCloseLevels.addEventListener('click', closeLevelsModal);
-            if (btnHudBack) btnHudBack.addEventListener('click', () => setMode('lobby'));
-            if (btnHudLevels) btnHudLevels.addEventListener('click', openLevelsModal);
-            if (btnHudSound) btnHudSound.addEventListener('click', toggleSound);
-            if (btnHudLobby) btnHudLobby.addEventListener('click', () => setMode('lobby'));
-        }
-
-        // =========================================================================
-        // BUCLE PRINCIPAL DE ANIMACIÓN Y ARRANQUE SEGURO
-        // =========================================================================
-        let lastTime = performance.now();
-        const startTime = lastTime;
-
-        function animate(now) {
+        function animate() {
             requestAnimationFrame(animate);
-            const currentNow = typeof now === 'number' ? now : performance.now();
-            const dt = Math.min((currentNow - lastTime) / 1000, 0.05);
-            const elapsed = (currentNow - startTime) / 1000;
-            lastTime = currentNow;
+            const dt = Math.min(clock.getDelta(), 0.05);
+            const elapsed = clock.getElapsedTime();
 
+            updateLavaSplashes(dt);
+            updateWorld(dt, elapsed);
             updatePlayer(dt, elapsed);
             updateCamera();
 
-            if (renderer && scene && camera) {
-                renderer.render(scene, camera);
-            }
+            renderer.render(scene, camera);
         }
 
-        function bootApp() {
+        window.addEventListener('load', () => {
             loadState();
-            updateHud();
-            bindMenuEvents();
+            initThree();
             bindControls();
-
-            const startEngine = () => {
-                try {
-                    if (!initThree()) {
-                        setTimeout(startEngine, 120);
-                        return;
-                    }
-                    buildLevel(state.currentLevel);
-                    setMode('lobby');
-                    requestAnimationFrame(animate);
-                } catch (err) {
-                    console.error('Error al iniciar Obby 3D:', err);
-                    setMode('lobby');
-                }
-            };
-
-            startEngine();
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', bootApp);
-        } else {
-            bootApp();
-        }
+            buildLevel(state.currentLevel);
+            updateHud();
+            animate();
+        });
     </script>
 </body>
 </html>
