@@ -176,7 +176,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v5';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v6';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -184,7 +184,8 @@
         const ANIM_RUN_GLB_URL = './Running%20%281%29%20%281%29.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        const PLAYER_TARGET_HEIGHT = 2.0;
+        // Escala fija directa para modelos exportados en centímetros (ajusta este número si hace falta)
+        const AMY_DIRECT_SCALE = 0.015;
         const MAP_TARGET_SPAN = 180;
 
         const state = {
@@ -408,7 +409,7 @@
             visualPivot: null,
             fallbackGroup: null,
             customModel: null,
-            baseScale: 1,
+            baseScale: AMY_DIRECT_SCALE,
             mixer: null,
             actions: { idle: null, run: null, jump: null },
             activeAnimKey: null,
@@ -427,7 +428,7 @@
             animBlend: 0
         };
 
-        const camCtrl = { yaw: 0, pitch: 0.4, distance: 16.0 };
+        const camCtrl = { yaw: 0, pitch: 0.35, distance: 15.5 };
 
         function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
@@ -445,7 +446,7 @@
                     const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
                     const hits = camRay.intersectObjects(mapMeshes, true);
                     if (hits.length > 0) {
-                        const safeDist = Math.max(9.5, hits[0].distance - 0.85);
+                        const safeDist = Math.max(9.0, hits[0].distance - 0.85);
                         desiredPos.copy(target).addScaledVector(dir, safeDist);
                     }
                 }
@@ -455,7 +456,7 @@
 
         function snapCameraToPlayer() {
             if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.3, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.4, player.pos.z);
             camera.position.copy(computeCameraDesiredPos(target));
             camera.lookAt(target);
         }
@@ -907,55 +908,10 @@
 
                     model.position.set(0, 0, 0);
                     model.rotation.set(0, Math.PI, 0);
-                    model.scale.set(1, 1, 1);
+                    model.scale.setScalar(AMY_DIRECT_SCALE);
                     model.updateMatrixWorld(true);
 
-                    // Calcular el tamaño real usando solo los meshes (ignorando huesos o nodos vacíos)
-                    const meshBox = new THREE.Box3();
-                    model.traverse((child) => {
-                        if (child.isMesh && child.geometry) {
-                            child.geometry.computeBoundingBox();
-                            const subBox = new THREE.Box3().setFromObject(child);
-                            if (Number.isFinite(subBox.min.y) && Number.isFinite(subBox.max.y)) {
-                                meshBox.union(subBox);
-                            }
-                        }
-                    });
-
-                    const size = new THREE.Vector3();
-                    if (!meshBox.isEmpty()) {
-                        meshBox.getSize(size);
-                    } else {
-                        new THREE.Box3().setFromObject(model).getSize(size);
-                    }
-
-                    const dominantDim = Math.max(size.y, size.x, size.z, 0.001);
-                    let scale = PLAYER_TARGET_HEIGHT / dominantDim;
-                    // Si el modelo ya estaba enorme por unidades (ej. cm), evitar escalas gigantes o micro
-                    if (dominantDim > 30) {
-                        scale = PLAYER_TARGET_HEIGHT / dominantDim;
-                    }
-
-                    player.baseScale = scale;
-                    model.scale.setScalar(scale);
-                    model.updateMatrixWorld(true);
-
-                    const scaledBox = new THREE.Box3();
-                    model.traverse((child) => {
-                        if (child.isMesh) {
-                            scaledBox.union(new THREE.Box3().setFromObject(child));
-                        }
-                    });
-
-                    const center = new THREE.Vector3();
-                    if (!scaledBox.isEmpty()) {
-                        scaledBox.getCenter(center);
-                        model.position.x = -center.x;
-                        model.position.z = -center.z;
-                        model.position.y = -scaledBox.min.y;
-                    }
-                    model.updateMatrixWorld(true);
-
+                    player.baseScale = AMY_DIRECT_SCALE;
                     if (player.customModel) player.visualPivot.remove(player.customModel);
 
                     player.customModel = model;
@@ -975,7 +931,7 @@
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
-                    showToast(`¡Amy escalada a ${PLAYER_TARGET_HEIGHT}u de alto!`, 2000);
+                    showToast(`¡Amy cargada con escala ${AMY_DIRECT_SCALE}!`, 2000);
                 },
                 undefined,
                 (err) => {
@@ -1603,16 +1559,16 @@
             }
 
             updateProceduralMovementAnimation(dt, Math.hypot(player.vel.x, player.vel.z));
-            if (player.customModel && player.baseScale) {
+            if (player.customModel) {
                 player.customModel.visible = true;
-                player.customModel.scale.setScalar(player.baseScale);
+                player.customModel.scale.setScalar(AMY_DIRECT_SCALE);
             }
             player.root.position.copy(player.pos);
         }
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.3, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.4, player.pos.z);
             camera.position.lerp(computeCameraDesiredPos(target), 0.16);
             camera.lookAt(target);
         }
