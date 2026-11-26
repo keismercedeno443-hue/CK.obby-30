@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Obby 3D Estilo Roblox — Aventura Aérea</title>
+    <title>Obby 3D Estilo Roblox — 100 Etapas</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -80,19 +80,19 @@
     <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-sky-500/75 via-blue-700/75 to-slate-950/85 backdrop-blur-sm">
         <div class="w-full max-w-md bg-slate-900/90 border-2 border-white/20 rounded-3xl p-6 text-white shadow-2xl text-center">
             <div class="inline-block bg-amber-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
-                OBBY 3D • AVENTURA AÉREA
+                OBBY 3D • 100 ETAPAS
             </div>
             <h1 class="roblox-title text-3xl sm:text-4xl font-bold tracking-tight mb-2">
-                Obby Aéreo Roblox
+                Colorful 100-Stage Obby
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Salta entre pisos, descansa en zonas seguras, esquiva la lava y derriba aves, águilas y dragones.
+                Salta por el mapa principal, guarda checkpoints, esquiva la lava y derriba enemigos voladores.
             </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
                 <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Etapa Máxima</div>
-                    <div id="lobby-max-level" class="text-lg font-black text-sky-300 mt-0.5">1 / 30</div>
+                    <div id="lobby-max-level" class="text-lg font-black text-sky-300 mt-0.5">1 / 100</div>
                 </div>
                 <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas</div>
@@ -105,7 +105,7 @@
                     ▶ JUGAR AHORA
                 </button>
                 <button id="btn-open-levels" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
-                    🗺️ Elegir Etapa (1 - 30)
+                    🗺️ Elegir Etapa (1 - 100)
                 </button>
             </div>
         </div>
@@ -125,12 +125,12 @@
                 </button>
             </div>
 
-            <!-- Barra central estilo Roblox (17/30) -->
+            <!-- Barra central estilo Roblox -->
             <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto bg-indigo-950/65 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-indigo-300/35 shadow-lg">
                 <button id="btn-stage-first" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Primera etapa">«</button>
                 <button id="btn-stage-prev" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Etapa anterior">‹</button>
                 <div class="px-2.5 sm:px-3.5 py-0.5 rounded-full bg-indigo-600/90 border border-indigo-200/40 text-white font-black text-xs sm:text-sm tracking-wide">
-                    <span id="hud-level-text" class="text-amber-300">1</span><span class="text-indigo-200/80">/30</span>
+                    <span id="hud-level-text" class="text-amber-300">1</span><span class="text-indigo-200/80">/100</span>
                 </div>
                 <button id="btn-stage-next" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Siguiente etapa">›</button>
                 <button id="btn-stage-max" class="roblox-btn w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500/80 hover:bg-indigo-400 text-white text-xs font-black flex items-center justify-center" title="Etapa máxima desbloqueada">»</button>
@@ -180,10 +180,12 @@
         // ==========================================
         // CONFIGURACIÓN Y ESTADO PERSISTENTE
         // ==========================================
-        const TOTAL_LEVELS = 30;
-        const STORAGE_KEY = 'obby_roblox_aereo_v1';
+        const TOTAL_LEVELS = 100;
+        const STORAGE_KEY = 'obby_roblox_100_main_v1';
         const PLAYER_GLB_URL = './Meshy_AI_Purple_Sprint_Runner_0604030029_texture-opt.glb';
-        const PLAYER_TARGET_HEIGHT = 3.0;
+        const MAP_GLB_URL = './colorful_100-stage_obby.glb';
+        const PLAYER_TARGET_HEIGHT = 2.6;
+        const MAP_TARGET_SPAN = 260;
 
         const state = {
             mode: 'lobby',
@@ -270,7 +272,7 @@
                 osc.start(now);
                 osc.stop(now + duration + 0.02);
             } catch (err) {
-                // Ignorar errores de audio en navegadores restringidos
+                // Ignorar errores de audio
             }
         }
 
@@ -287,12 +289,6 @@
         function sfxEnemyDown() {
             playTone(320, 0.12, 'sawtooth', 0.085, 110);
             setTimeout(() => playTone(660, 0.1, 'triangle', 0.07, 940), 60);
-        }
-        function sfxPortal() {
-            const notes = [523.25, 659.25, 783.99, 1046.5];
-            notes.forEach((n, idx) => {
-                setTimeout(() => playTone(n, 0.16, 'triangle', 0.085), idx * 75);
-            });
         }
         function sfxFail() { playTone(220, 0.25, 'sawtooth', 0.08, 95); }
 
@@ -397,10 +393,10 @@
                     if (!unlocked) return;
                     state.currentLevel = i;
                     saveState();
-                    buildLevel(i);
+                    teleportToStageProgress(i);
                     closeLevelsModal();
                     setMode('playing');
-                    showToast(`Etapa ${i} cargada`);
+                    showToast(`Etapa ${i} seleccionada`);
                 });
                 grid.appendChild(btn);
             }
@@ -417,19 +413,21 @@
         }
 
         // ==========================================
-        // ESCENA THREE.JS, TEXTURAS Y MUNDO ABIERTO
+        // ESCENA THREE.JS, MAPA PRINCIPAL Y JUGADOR
         // ==========================================
         let scene, camera, renderer, clock;
-        let levelGroup, sceneryGroup;
+        let mapGroup, entitiesGroup, sceneryGroup;
         let lavaSeaMesh, lavaSeaMat;
-        let portalMesh = null, portalPos = null;
-        let currentSpawn = new THREE.Vector3(0, 2, 0);
+        let mapLoaded = false;
+        let mapMeshes = [];
+        let mapBox = null;
+        let lavaFloorY = -16;
+        let currentSpawn = new THREE.Vector3(0, 4, 0);
 
-        const platforms = [];
-        const ladders = [];
-        const lavaZones = [];
+        const raycaster = new THREE.Raycaster();
+        const downDir = new THREE.Vector3(0, -1, 0);
+
         const coins = [];
-        const spinners = [];
         const checkpoints = [];
         const lavaSplashes = [];
         const aerialEnemies = [];
@@ -447,7 +445,7 @@
             rightLeg: null,
             leftArm: null,
             rightArm: null,
-            pos: new THREE.Vector3(0, 2, 0),
+            pos: new THREE.Vector3(0, 4, 0),
             vel: new THREE.Vector3(0, 0, 0),
             yaw: 0,
             onGround: false,
@@ -459,7 +457,7 @@
         const camCtrl = {
             yaw: 0,
             pitch: 0.34,
-            distance: 11.5
+            distance: 10.5
         };
 
         function getStuddedMaterial(hexColor, roughness = 0.55) {
@@ -540,16 +538,12 @@
             const tex = new THREE.CanvasTexture(canvas);
             tex.wrapS = THREE.RepeatWrapping;
             tex.wrapT = THREE.RepeatWrapping;
-            tex.repeat.set(24, 24);
+            tex.repeat.set(28, 28);
             tex.encoding = THREE.sRGBEncoding;
             return tex;
         }
 
-        function buildOpenWorldScenery() {
-            while (sceneryGroup.children.length > 0) {
-                sceneryGroup.remove(sceneryGroup.children[0]);
-            }
-
+        function buildLavaSea() {
             const lavaTex = createLiquidLavaTexture();
             lavaSeaMat = new THREE.MeshStandardMaterial({
                 map: lavaTex,
@@ -560,75 +554,15 @@
                 metalness: 0.1
             });
 
-            const seaGeo = new THREE.PlaneGeometry(360, 360, 48, 48);
+            const seaGeo = new THREE.PlaneGeometry(750, 750, 24, 24);
             seaGeo.rotateX(-Math.PI / 2);
             lavaSeaMesh = new THREE.Mesh(seaGeo, lavaSeaMat);
-            lavaSeaMesh.position.set(0, -14, -65);
+            lavaSeaMesh.position.set(0, lavaFloorY, 0);
             sceneryGroup.add(lavaSeaMesh);
-
-            const islandPositions = [
-                [-52, -9, -20, 22], [54, -8, -32, 24], [-64, -7, -75, 28],
-                [62, -6, -85, 26], [0, -10, -125, 34], [-45, -8, -145, 24]
-            ];
-
-            islandPositions.forEach(([ix, iy, iz, radius], idx) => {
-                const island = new THREE.Group();
-                island.position.set(ix, iy, iz);
-
-                const dirt = new THREE.Mesh(
-                    new THREE.CylinderGeometry(radius, radius * 0.65, 10, 8),
-                    getStuddedMaterial(0x78350f, 0.8)
-                );
-                dirt.position.y = -5;
-                island.add(dirt);
-
-                const grass = new THREE.Mesh(
-                    new THREE.CylinderGeometry(radius * 1.03, radius, 2.2, 8),
-                    getStuddedMaterial(idx % 2 === 0 ? 0x22c55e : 0x16a34a, 0.65)
-                );
-                grass.position.y = 0.8;
-                island.add(grass);
-
-                for (let t = 0; t < 4; t++) {
-                    const ang = (t / 4) * Math.PI * 2 + idx;
-                    const tx = Math.cos(ang) * (radius * 0.48);
-                    const tz = Math.sin(ang) * (radius * 0.48);
-                    const trunk = new THREE.Mesh(
-                        new THREE.BoxGeometry(1.4, 3.6, 1.4),
-                        getStuddedMaterial(0x713f12, 0.75)
-                    );
-                    trunk.position.set(tx, 3.6, tz);
-                    island.add(trunk);
-
-                    const crown = new THREE.Mesh(
-                        new THREE.BoxGeometry(4.4, 4.2, 4.4),
-                        getStuddedMaterial(0x15803d, 0.6)
-                    );
-                    crown.position.set(tx, 7.2, tz);
-                    island.add(crown);
-                }
-
-                sceneryGroup.add(island);
-            });
-
-            const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
-            for (let c = 0; c < 14; c++) {
-                const cg = new THREE.Group();
-                const cx = (Math.random() - 0.5) * 180;
-                const cy = 22 + Math.random() * 14;
-                const cz = -15 - Math.random() * 140;
-                cg.position.set(cx, cy, cz);
-
-                const p1 = new THREE.Mesh(new THREE.BoxGeometry(7, 2.2, 4.5), cloudMat);
-                const p2 = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.8, 4), cloudMat);
-                p2.position.set(1.5, 1.1, 0);
-                cg.add(p1, p2);
-                sceneryGroup.add(cg);
-            }
         }
 
         function initLavaSplashPool() {
-            const geo = new THREE.SphereGeometry(0.22, 8, 8);
+            const geo = new THREE.SphereGeometry(0.24, 8, 8);
             for (let i = 0; i < 42; i++) {
                 const isSpark = i % 3 === 0;
                 const mat = new THREE.MeshBasicMaterial({
@@ -653,9 +587,9 @@
             slot.mesh.visible = true;
             slot.mesh.position.set(x, y, z);
             slot.vel.set(
-                (Math.random() - 0.5) * 4.5,
-                5.5 + Math.random() * 6.5,
-                (Math.random() - 0.5) * 4.5
+                (Math.random() - 0.5) * 5.0,
+                6.0 + Math.random() * 7.0,
+                (Math.random() - 0.5) * 5.0
             );
             slot.life = 0.85 + Math.random() * 0.45;
         }
@@ -666,10 +600,10 @@
                 lavaSeaMat.map.offset.y += dt * 0.04;
             }
 
-            if (Math.random() < dt * 22 && player.pos) {
-                const sx = player.pos.x + (Math.random() - 0.5) * 34;
-                const sz = player.pos.z + (Math.random() - 0.5) * 34;
-                spawnLavaSplashDroplet(sx, -13.6, sz);
+            if (Math.random() < dt * 20 && player.pos) {
+                const sx = player.pos.x + (Math.random() - 0.5) * 40;
+                const sz = player.pos.z + (Math.random() - 0.5) * 40;
+                spawnLavaSplashDroplet(sx, lavaFloorY + 0.3, sz);
             }
 
             for (const s of lavaSplashes) {
@@ -677,18 +611,282 @@
                 s.life -= dt;
                 s.vel.y -= 16.5 * dt;
                 s.mesh.position.addScaledVector(s.vel, dt);
-                if (s.life <= 0 || s.mesh.position.y < -14.5) {
+                if (s.life <= 0 || s.mesh.position.y < lavaFloorY - 0.5) {
                     s.active = false;
                     s.mesh.visible = false;
                 }
             }
         }
 
-        function loadCustomPlayerGLB() {
+        function findSurfaceHeightAt(x, z, startY = 80) {
+            if (!mapLoaded || mapMeshes.length === 0) return null;
+            raycaster.set(new THREE.Vector3(x, startY, z), downDir);
+            raycaster.far = 220;
+            const hits = raycaster.intersectObjects(mapMeshes, true);
+            for (const h of hits) {
+                if (h.face && h.face.normal.y > 0.35) {
+                    return h.point.y;
+                }
+            }
+            return hits.length > 0 ? hits[0].point.y : null;
+        }
+
+        function clearEntities() {
+            while (entitiesGroup.children.length > 0) {
+                entitiesGroup.remove(entitiesGroup.children[0]);
+            }
+            coins.length = 0;
+            checkpoints.length = 0;
+            aerialEnemies.length = 0;
+            playerShots.length = 0;
+            enemyFireballs.length = 0;
+        }
+
+        function addCoin(x, y, z) {
+            const mesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.55, 0.55, 0.18, 16),
+                new THREE.MeshStandardMaterial({
+                    color: 0xfacc15,
+                    emissive: 0xca8a04,
+                    emissiveIntensity: 0.35,
+                    metalness: 0.5,
+                    roughness: 0.25
+                })
+            );
+            mesh.rotation.x = Math.PI / 2;
+            mesh.position.set(x, y, z);
+            entitiesGroup.add(mesh);
+            coins.push({ mesh, x, y, z, collected: false });
+        }
+
+        function addCheckpoint(x, y, z, stageNum) {
+            const pad = new THREE.Mesh(
+                new THREE.BoxGeometry(3.0, 0.28, 3.0),
+                new THREE.MeshStandardMaterial({
+                    color: 0x22c55e,
+                    emissive: 0x15803d,
+                    emissiveIntensity: 0.4
+                })
+            );
+            pad.position.set(x, y + 0.14, z);
+            entitiesGroup.add(pad);
+
+            checkpoints.push({
+                x, y: y + 0.35, z,
+                stageNum,
+                activated: false,
+                pad
+            });
+        }
+
+        function addAerialEnemy(kind, x, y, z, patrolRadius = 5.5, speed = 2.0) {
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+
+            const isDragon = kind === 'dragon';
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: isDragon ? 0x991b1b : 0x78350f,
+                roughness: 0.45
+            });
+            const accentMat = new THREE.MeshStandardMaterial({
+                color: isDragon ? 0xf97316 : 0xfef08a,
+                emissive: isDragon ? 0xc2410c : 0x000000,
+                emissiveIntensity: isDragon ? 0.35 : 0,
+                roughness: 0.4
+            });
+
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 1.25 : 0.85, isDragon ? 0.95 : 0.7, isDragon ? 2.15 : 1.3),
+                bodyMat
+            );
+            body.castShadow = true;
+            group.add(body);
+
+            const head = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 0.85 : 0.65, isDragon ? 0.75 : 0.6, isDragon ? 0.95 : 0.75),
+                isDragon ? accentMat : bodyMat
+            );
+            head.position.set(0, 0.35, isDragon ? -1.35 : -0.85);
+            group.add(head);
+
+            const leftWing = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75),
+                accentMat
+            );
+            leftWing.position.set(isDragon ? -1.5 : -1.2, 0.15, 0);
+            group.add(leftWing);
+
+            const rightWing = new THREE.Mesh(
+                new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75),
+                accentMat
+            );
+            rightWing.position.set(isDragon ? 1.5 : 1.2, 0.15, 0);
+            group.add(rightWing);
+
+            entitiesGroup.add(group);
+            aerialEnemies.push({
+                kind,
+                group,
+                leftWing,
+                rightWing,
+                baseX: x,
+                baseY: y,
+                baseZ: z,
+                patrolRadius,
+                speed,
+                hp: isDragon ? 2 : 1,
+                alive: true,
+                respawnTimer: 0,
+                fireCooldown: 1.4 + Math.random() * 1.2,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        function populateMapEntities() {
+            clearEntities();
+            if (!mapBox) return;
+
+            const spanX = mapBox.max.x - mapBox.min.x;
+            const spanZ = mapBox.max.z - mapBox.min.z;
+            const searchTopY = mapBox.max.y + 15;
+
+            let validStart = null;
+            const candidateOffsets = [
+                [0, 0],
+                [mapBox.min.x * 0.45, mapBox.max.z * 0.45],
+                [mapBox.max.x * 0.45, mapBox.max.z * 0.45],
+                [0, mapBox.max.z * 0.4],
+                [mapBox.min.x * 0.35, mapBox.min.z * 0.35]
+            ];
+
+            for (const [cx, cz] of candidateOffsets) {
+                const sy = findSurfaceHeightAt(cx, cz, searchTopY);
+                if (typeof sy === 'number' && Number.isFinite(sy)) {
+                    validStart = new THREE.Vector3(cx, sy + 0.6, cz);
+                    break;
+                }
+            }
+
+            if (!validStart) {
+                const center = new THREE.Vector3();
+                mapBox.getCenter(center);
+                const sy = findSurfaceHeightAt(center.x, center.z, searchTopY);
+                validStart = new THREE.Vector3(
+                    center.x,
+                    typeof sy === 'number' ? sy + 0.6 : mapBox.max.y + 1.5,
+                    center.z
+                );
+            }
+
+            currentSpawn.copy(validStart);
+            player.pos.copy(currentSpawn);
+            player.vel.set(0, 0, 0);
+            player.jumpsUsed = 0;
+
+            for (let step = 1; step <= 18; step++) {
+                const frac = step / 19;
+                const px = THREE.MathUtils.lerp(validStart.x, (Math.random() - 0.5) * spanX * 0.65, frac * 0.75);
+                const pz = THREE.MathUtils.lerp(validStart.z, mapBox.min.z * 0.72, frac);
+                const surfY = findSurfaceHeightAt(px, pz, searchTopY);
+                if (typeof surfY === 'number') {
+                    addCoin(px, surfY + 1.5, pz);
+                    if (step % 3 === 0) {
+                        const stageCheckpoint = Math.min(TOTAL_LEVELS, Math.round((step / 18) * TOTAL_LEVELS));
+                        addCheckpoint(px, surfY, pz, stageCheckpoint);
+                    }
+                    if (step % 4 === 0) {
+                        const kind = step % 8 === 0 ? 'dragon' : (step % 2 === 0 ? 'eagle' : 'bird');
+                        addAerialEnemy(kind, px, surfY + 4.5, pz, 5.5, 1.9);
+                    }
+                }
+            }
+        }
+
+        function teleportToStageProgress(stageNum) {
+            if (!mapLoaded || !mapBox) return;
+            const frac = Math.max(0, Math.min(1, (stageNum - 1) / (TOTAL_LEVELS - 1)));
+            const spanX = mapBox.max.x - mapBox.min.x;
+            const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.25);
+            const targetZ = THREE.MathUtils.lerp(currentSpawn.z, mapBox.min.z * 0.75, frac);
+            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 15);
+            const destY = typeof surfY === 'number' ? surfY + 0.6 : currentSpawn.y;
+
+            currentSpawn.set(targetX, destY, targetZ);
+            player.pos.copy(currentSpawn);
+            player.vel.set(0, 0, 0);
+            player.jumpsUsed = 0;
+        }
+
+        function loadMainObbyMapGLB() {
             if (typeof THREE.GLTFLoader !== 'function') {
-                console.warn('GLTFLoader no disponible; se mantiene el personaje base.');
+                showToast('Error: GLTFLoader no disponible', 2200);
                 return;
             }
+
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                MAP_GLB_URL,
+                (gltf) => {
+                    if (!gltf || !gltf.scene || !mapGroup) return;
+
+                    while (mapGroup.children.length > 0) {
+                        mapGroup.remove(mapGroup.children[0]);
+                    }
+                    mapMeshes = [];
+
+                    const model = gltf.scene;
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material && child.material.map) {
+                                child.material.map.encoding = THREE.sRGBEncoding;
+                                child.material.needsUpdate = true;
+                            }
+                            mapMeshes.push(child);
+                        }
+                    });
+
+                    model.updateMatrixWorld(true);
+                    let box = new THREE.Box3().setFromObject(model);
+                    const size = new THREE.Vector3();
+                    box.getSize(size);
+                    const maxDim = Math.max(size.x, size.z, 1);
+                    const scale = MAP_TARGET_SPAN / maxDim;
+                    model.scale.setScalar(scale);
+
+                    model.updateMatrixWorld(true);
+                    box = new THREE.Box3().setFromObject(model);
+                    const center = new THREE.Vector3();
+                    box.getCenter(center);
+
+                    model.position.x -= center.x;
+                    model.position.z -= center.z;
+                    model.position.y -= box.min.y;
+
+                    model.updateMatrixWorld(true);
+                    mapBox = new THREE.Box3().setFromObject(model);
+
+                    lavaFloorY = Math.min(-12, mapBox.min.y - 10);
+                    if (lavaSeaMesh) {
+                        lavaSeaMesh.position.y = lavaFloorY;
+                    }
+
+                    mapGroup.add(model);
+                    mapLoaded = true;
+                    populateMapEntities();
+                    showToast('¡Mapa de 100 etapas cargado!', 1800);
+                },
+                undefined,
+                (err) => {
+                    console.warn('Error cargando mapa GLB:', err);
+                    showToast('No se pudo cargar el mapa .glb', 2200);
+                }
+            );
+        }
+
+        function loadCustomPlayerGLB() {
+            if (typeof THREE.GLTFLoader !== 'function') return;
 
             const loader = new THREE.GLTFLoader();
             loader.load(
@@ -743,13 +941,10 @@
                         const action = player.mixer.clipAction(gltf.animations[0]);
                         action.play();
                     }
-
-                    showToast('¡Personaje 3D cargado!', 1600);
                 },
                 undefined,
                 (err) => {
-                    console.warn('No se pudo cargar el .glb, usando personaje base:', err);
-                    showToast('Aviso: no cargó el .glb, usando cubo base', 2200);
+                    console.warn('No se pudo cargar personaje GLB:', err);
                 }
             );
         }
@@ -814,9 +1009,9 @@
             const canvas = document.getElementById('game-canvas');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x38bdf8);
-            scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0042);
+            scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0022);
 
-            camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 450);
+            camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 900);
 
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -827,23 +1022,25 @@
 
             clock = new THREE.Clock();
 
-            const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 0.95);
+            const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.0);
             scene.add(hemiLight);
 
-            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.05);
-            dirLight.position.set(28, 45, 22);
+            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.1);
+            dirLight.position.set(45, 90, 35);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024;
             dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
             sceneryGroup = new THREE.Group();
-            levelGroup = new THREE.Group();
-            scene.add(sceneryGroup, levelGroup);
+            mapGroup = new THREE.Group();
+            entitiesGroup = new THREE.Group();
+            scene.add(sceneryGroup, mapGroup, entitiesGroup);
 
-            buildOpenWorldScenery();
+            buildLavaSea();
             initLavaSplashPool();
             buildRobloxPlayer();
+            loadMainObbyMapGLB();
 
             window.addEventListener('resize', () => {
                 if (!camera || !renderer) return;
@@ -854,234 +1051,20 @@
         }
 
         // ==========================================
-        // CONSTRUCCIÓN DE NIVELES, PISOS Y ENEMIGOS
+        // DISPAROS, ENEMIGOS Y CONTROLES
         // ==========================================
-        function clearLevel() {
-            while (levelGroup.children.length > 0) {
-                levelGroup.remove(levelGroup.children[0]);
-            }
-            platforms.length = 0;
-            ladders.length = 0;
-            lavaZones.length = 0;
-            coins.length = 0;
-            spinners.length = 0;
-            checkpoints.length = 0;
-            aerialEnemies.length = 0;
-            playerShots.length = 0;
-            enemyFireballs.length = 0;
-            portalMesh = null;
-            portalPos = null;
-        }
-
-        function addPlatform(x, y, z, w, h, d, colorHex = 0xe2e8f0) {
-            const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(w, h, d),
-                getStuddedMaterial(colorHex, 0.5)
-            );
-            mesh.position.set(x, y, z);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            levelGroup.add(mesh);
-
-            platforms.push({
-                x, y, z, w, h, d,
-                top: y + h / 2,
-                bottom: y - h / 2,
-                minX: x - w / 2,
-                maxX: x + w / 2,
-                minZ: z - d / 2,
-                maxZ: z + d / 2
-            });
-            return mesh;
-        }
-
-        function addSafeRestFloor(x, y, z, w = 16, d = 14, colorHex = 0x38bdf8) {
-            addPlatform(x, y, z, w, 1.4, d, colorHex);
-            const railMat = getStuddedMaterial(0xf8fafc, 0.4);
-            const frontRail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, 0.35), railMat);
-            frontRail.position.set(x, y + 0.85, z + d / 2 - 0.2);
-            levelGroup.add(frontRail);
-        }
-
-        function addLavaBlock(x, y, z, w, d) {
-            const mat = new THREE.MeshStandardMaterial({
-                color: 0xff4500,
-                emissive: 0xea580c,
-                emissiveIntensity: 0.7,
-                roughness: 0.25
-            });
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.55, d), mat);
-            mesh.position.set(x, y, z);
-            levelGroup.add(mesh);
-
-            lavaZones.push({
-                x, y, z,
-                halfW: w / 2,
-                halfD: d / 2,
-                top: y + 0.35
-            });
-        }
-
-        function addSpinner(x, y, z, length = 7.5, speed = 1.6) {
-            const pivot = new THREE.Group();
-            pivot.position.set(x, y, z);
-
-            const bar = new THREE.Mesh(
-                new THREE.BoxGeometry(length, 0.55, 0.65),
-                new THREE.MeshStandardMaterial({
-                    color: 0xef4444,
-                    emissive: 0xb91c1c,
-                    emissiveIntensity: 0.45
-                })
-            );
-            pivot.add(bar);
-            levelGroup.add(pivot);
-
-            spinners.push({ pivot, x, y, z, length, speed });
-        }
-
-        function addCoin(x, y, z) {
-            const mesh = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.55, 0.55, 0.18, 16),
-                new THREE.MeshStandardMaterial({
-                    color: 0xfacc15,
-                    emissive: 0xca8a04,
-                    emissiveIntensity: 0.35,
-                    metalness: 0.5,
-                    roughness: 0.25
-                })
-            );
-            mesh.rotation.x = Math.PI / 2;
-            mesh.position.set(x, y, z);
-            levelGroup.add(mesh);
-            coins.push({ mesh, x, y, z, collected: false });
-        }
-
-        function addCheckpoint(x, y, z, label = 'CP') {
-            const pad = new THREE.Mesh(
-                new THREE.BoxGeometry(3.2, 0.25, 3.2),
-                new THREE.MeshStandardMaterial({
-                    color: 0x22c55e,
-                    emissive: 0x15803d,
-                    emissiveIntensity: 0.4
-                })
-            );
-            pad.position.set(x, y + 0.78, z);
-            levelGroup.add(pad);
-
-            checkpoints.push({
-                x, y: y + 0.9, z,
-                label,
-                activated: false,
-                pad
-            });
-        }
-
-        function addPortal(x, y, z) {
-            const group = new THREE.Group();
-            group.position.set(x, y + 2.2, z);
-
-            const ring = new THREE.Mesh(
-                new THREE.TorusGeometry(2.1, 0.26, 12, 28),
-                new THREE.MeshStandardMaterial({
-                    color: 0xa855f7,
-                    emissive: 0x7e22ce,
-                    emissiveIntensity: 0.6
-                })
-            );
-            group.add(ring);
-
-            const core = new THREE.Mesh(
-                new THREE.CircleGeometry(1.85, 24),
-                new THREE.MeshBasicMaterial({
-                    color: 0x38bdf8,
-                    transparent: true,
-                    opacity: 0.72,
-                    side: THREE.DoubleSide
-                })
-            );
-            group.add(core);
-
-            levelGroup.add(group);
-            portalMesh = core;
-            portalPos = new THREE.Vector3(x, y + 2.1, z);
-        }
-
-        function addAerialEnemy(kind, x, y, z, patrolRadius = 5.5, speed = 2.0) {
-            const group = new THREE.Group();
-            group.position.set(x, y, z);
-
-            const isDragon = kind === 'dragon';
-            const bodyMat = new THREE.MeshStandardMaterial({
-                color: isDragon ? 0x991b1b : 0x78350f,
-                roughness: 0.45
-            });
-            const accentMat = new THREE.MeshStandardMaterial({
-                color: isDragon ? 0xf97316 : 0xfef08a,
-                emissive: isDragon ? 0xc2410c : 0x000000,
-                emissiveIntensity: isDragon ? 0.35 : 0,
-                roughness: 0.4
-            });
-
-            const body = new THREE.Mesh(
-                new THREE.BoxGeometry(isDragon ? 1.25 : 0.85, isDragon ? 0.95 : 0.7, isDragon ? 2.15 : 1.3),
-                bodyMat
-            );
-            body.castShadow = true;
-            group.add(body);
-
-            const head = new THREE.Mesh(
-                new THREE.BoxGeometry(isDragon ? 0.85 : 0.65, isDragon ? 0.75 : 0.6, isDragon ? 0.95 : 0.75),
-                isDragon ? accentMat : bodyMat
-            );
-            head.position.set(0, 0.35, isDragon ? -1.35 : -0.85);
-            group.add(head);
-
-            const leftWing = new THREE.Mesh(
-                new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75),
-                accentMat
-            );
-            leftWing.position.set(isDragon ? -1.5 : -1.2, 0.15, 0);
-            group.add(leftWing);
-
-            const rightWing = new THREE.Mesh(
-                new THREE.BoxGeometry(isDragon ? 2.4 : 1.9, 0.18, isDragon ? 1.1 : 0.75),
-                accentMat
-            );
-            rightWing.position.set(isDragon ? 1.5 : 1.2, 0.15, 0);
-            group.add(rightWing);
-
-            levelGroup.add(group);
-            aerialEnemies.push({
-                kind,
-                group,
-                leftWing,
-                rightWing,
-                baseX: x,
-                baseY: y,
-                baseZ: z,
-                patrolRadius,
-                speed,
-                hp: isDragon ? 2 : 1,
-                alive: true,
-                respawnTimer: 0,
-                fireCooldown: 1.4 + Math.random() * 1.2,
-                phase: Math.random() * Math.PI * 2
-            });
-        }
-
         function spawnPlayerShot() {
             if (state.mode !== 'playing' || !player.pos) return;
             sfxShoot();
 
             const dir = new THREE.Vector3(
                 -Math.sin(player.yaw),
-                0.1,
+                0.08,
                 -Math.cos(player.yaw)
             ).normalize();
 
             let bestEnemy = null;
-            let bestDist = 28;
+            let bestDist = 30;
             for (const en of aerialEnemies) {
                 if (!en.alive) continue;
                 const d = player.pos.distanceTo(en.group.position);
@@ -1102,12 +1085,12 @@
             );
             shotMesh.position.set(player.pos.x, player.pos.y + 1.1, player.pos.z);
             shotMesh.lookAt(shotMesh.position.clone().add(dir));
-            levelGroup.add(shotMesh);
+            entitiesGroup.add(shotMesh);
 
             playerShots.push({
                 mesh: shotMesh,
                 vel: dir.multiplyScalar(28),
-                life: 1.15
+                life: 1.2
             });
         }
 
@@ -1118,7 +1101,7 @@
                 new THREE.MeshBasicMaterial({ color: 0xf97316 })
             );
             ball.position.copy(fromPos);
-            levelGroup.add(ball);
+            entitiesGroup.add(ball);
 
             enemyFireballs.push({
                 mesh: ball,
@@ -1127,79 +1110,16 @@
             });
         }
 
-        function buildLevel(levelNum) {
-            clearLevel();
-            const palette = [0xe2e8f0, 0x60a5fa, 0x34d399, 0xfbbf24, 0xc084fc, 0xf87171];
-            const mainColor = palette[(levelNum - 1) % palette.length];
-            const speedScale = 1 + (levelNum - 1) * 0.035;
-
-            addSafeRestFloor(0, 0, 0, 16, 15, 0xe2e8f0);
-            currentSpawn.set(0, 1.2, 2);
-            player.pos.copy(currentSpawn);
-            player.vel.set(0, 0, 0);
-            player.jumpsUsed = 0;
-
-            let curX = 0;
-            let curY = 0;
-            let curZ = -10;
-            const obstacleCount = 6 + Math.floor(levelNum * 0.35);
-
-            for (let i = 0; i < obstacleCount; i++) {
-                const zig = Math.sin(i * 1.15 + levelNum) * 3.2;
-                curX = zig;
-                curY = Math.max(0, curY + (i % 3 === 0 ? 0.55 : -0.25));
-                curZ -= 7.5;
-
-                const platW = Math.max(7.2, 10.5 - levelNum * 0.08);
-                const platD = Math.max(6.8, 9.2 - levelNum * 0.06);
-                addPlatform(curX, curY, curZ, platW, 1.2, platD, mainColor);
-
-                if (i % 2 === 1) {
-                    addSpinner(curX, curY + 1.05, curZ, Math.min(8.5, platW * 0.85), 1.45 * speedScale);
-                } else {
-                    addLavaBlock(curX + (i % 4 === 0 ? 1.5 : -1.5), curY + 0.65, curZ, 2.2, 2.2);
-                }
-
-                addCoin(curX, curY + 1.8, curZ);
-
-                if (i % 2 === 0 || levelNum >= 3) {
-                    const useDragon = levelNum >= 4 && (i % 3 === 1 || levelNum >= 10);
-                    const kind = useDragon ? 'dragon' : (i % 2 === 0 ? 'eagle' : 'bird');
-                    addAerialEnemy(
-                        kind,
-                        curX,
-                        curY + (useDragon ? 4.6 : 3.4),
-                        curZ - 1.5,
-                        useDragon ? 6.5 : 4.8,
-                        (useDragon ? 1.75 : 2.2) * speedScale
-                    );
-                }
-
-                if (i % 2 === 1 && i < obstacleCount - 1) {
-                    curZ -= 8.2;
-                    addSafeRestFloor(curX, curY, curZ, 15, 13, 0x38bdf8);
-                    addCheckpoint(curX, curY, curZ, `CP ${i + 1}`);
-                }
-            }
-
-            curZ -= 9.0;
-            addSafeRestFloor(curX, curY, curZ, 16, 15, 0x22c55e);
-            addPortal(curX, curY + 0.7, curZ - 2.5);
-        }
-
         function respawnPlayer(byHazard = false) {
             if (byHazard) sfxFail();
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
             if (byHazard) {
-                showToast('¡Cuidado! Regresaste al último punto seguro', 1400);
+                showToast('¡Caíste en la lava! Regresaste al checkpoint', 1400);
             }
         }
 
-        // ==========================================
-        // CONTROLES TÁCTILES INVISIBLES + TECLADO
-        // ==========================================
         const input = {
             keys: {},
             joyActive: false,
@@ -1232,7 +1152,7 @@
         function triggerJump() {
             if (state.mode !== 'playing') return;
             if (player.onGround || player.jumpsUsed < player.maxJumps) {
-                player.vel.y = player.onGround ? 11.6 : 10.4;
+                player.vel.y = player.onGround ? 12.2 : 10.8;
                 player.onGround = false;
                 player.jumpsUsed += 1;
                 sfxJump();
@@ -1351,7 +1271,6 @@
 
             document.getElementById('btn-play')?.addEventListener('click', () => {
                 ensureAudioContext();
-                buildLevel(state.currentLevel);
                 setMode('playing');
             });
             document.getElementById('btn-open-levels')?.addEventListener('click', openLevelsModal);
@@ -1365,7 +1284,7 @@
                 if (clamped === state.currentLevel) return;
                 state.currentLevel = clamped;
                 saveState();
-                buildLevel(clamped);
+                teleportToStageProgress(clamped);
                 updateHud();
                 showToast(`Etapa ${clamped}`, 1100);
             };
@@ -1390,18 +1309,10 @@
         // SIMULACIÓN DEL MUNDO, JUGADOR Y CÁMARA
         // ==========================================
         function updateWorld(dt, elapsed) {
-            for (const sp of spinners) {
-                sp.pivot.rotation.y += sp.speed * dt;
-            }
-
             for (const c of coins) {
                 if (c.collected) continue;
                 c.mesh.rotation.z += 2.6 * dt;
                 c.mesh.position.y = c.y + Math.sin(elapsed * 3.5 + c.x) * 0.2;
-            }
-
-            if (portalMesh) {
-                portalMesh.material.opacity = 0.62 + Math.sin(elapsed * 4.2) * 0.22;
             }
 
             for (const en of aerialEnemies) {
@@ -1430,7 +1341,7 @@
 
                 if (en.kind === 'dragon' && state.mode === 'playing') {
                     const distToPlayer = en.group.position.distanceTo(player.pos);
-                    if (distToPlayer < 24) {
+                    if (distToPlayer < 26) {
                         en.fireCooldown -= dt;
                         if (en.fireCooldown <= 0) {
                             en.fireCooldown = 2.3;
@@ -1471,7 +1382,7 @@
                 }
 
                 if (hit || shot.life <= 0) {
-                    levelGroup.remove(shot.mesh);
+                    entitiesGroup.remove(shot.mesh);
                     playerShots.splice(i, 1);
                 }
             }
@@ -1484,7 +1395,7 @@
                 if (state.mode === 'playing') {
                     const pCenter = new THREE.Vector3(player.pos.x, player.pos.y + 0.95, player.pos.z);
                     if (ball.mesh.position.distanceTo(pCenter) < 1.05) {
-                        levelGroup.remove(ball.mesh);
+                        entitiesGroup.remove(ball.mesh);
                         enemyFireballs.splice(i, 1);
                         respawnPlayer(true);
                         continue;
@@ -1492,7 +1403,7 @@
                 }
 
                 if (ball.life <= 0) {
-                    levelGroup.remove(ball.mesh);
+                    entitiesGroup.remove(ball.mesh);
                     enemyFireballs.splice(i, 1);
                 }
             }
@@ -1507,7 +1418,7 @@
 
             if (state.mode !== 'playing') {
                 player.root.position.copy(player.pos);
-                player.root.rotation.y = elapsed * 0.5;
+                player.root.rotation.y = elapsed * 0.45;
                 return;
             }
 
@@ -1532,67 +1443,78 @@
                 .addScaledVector(right, moveX)
                 .addScaledVector(forward, -moveZ);
 
-            const moveSpeed = 8.4;
+            const moveSpeed = 9.0;
             player.vel.x = wishDir.x * moveSpeed;
             player.vel.z = wishDir.z * moveSpeed;
-            player.vel.y -= 26.5 * dt;
+            player.vel.y -= 27.0 * dt;
 
             const prevY = player.pos.y;
-            player.pos.addScaledVector(player.vel, dt);
+            const nextX = player.pos.x + player.vel.x * dt;
+            const nextZ = player.pos.z + player.vel.z * dt;
+            const nextY = player.pos.y + player.vel.y * dt;
 
             if (wishDir.lengthSq() > 0.001) {
                 const targetYaw = Math.atan2(-wishDir.x, -wishDir.z);
                 player.yaw = targetYaw;
                 player.root.rotation.y = targetYaw;
+
+                if (mapLoaded && mapMeshes.length > 0 && wishDir.lengthSq() > 0.01) {
+                    const wallRay = new THREE.Raycaster(
+                        new THREE.Vector3(player.pos.x, player.pos.y + 1.0, player.pos.z),
+                        wishDir.clone().normalize()
+                    );
+                    wallRay.far = 0.75;
+                    const wallHits = wallRay.intersectObjects(mapMeshes, true);
+                    const blockingWall = wallHits.find(h => Math.abs(h.face.normal.y) < 0.35);
+                    if (!blockingWall) {
+                        player.pos.x = nextX;
+                        player.pos.z = nextZ;
+                    }
+                } else {
+                    player.pos.x = nextX;
+                    player.pos.z = nextZ;
+                }
             }
 
+            player.pos.y = nextY;
             player.onGround = false;
-            for (const p of platforms) {
-                const withinXZ =
-                    player.pos.x + 0.42 >= p.minX &&
-                    player.pos.x - 0.42 <= p.maxX &&
-                    player.pos.z + 0.42 >= p.minZ &&
-                    player.pos.z - 0.42 <= p.maxZ;
 
-                if (withinXZ && player.vel.y <= 0 && prevY >= p.top - 0.25 && player.pos.y <= p.top) {
-                    player.pos.y = p.top;
+            if (mapLoaded && mapMeshes.length > 0 && player.vel.y <= 0) {
+                const sampleOffsets = [
+                    [0, 0],
+                    [-0.32, -0.32],
+                    [0.32, -0.32],
+                    [-0.32, 0.32],
+                    [0.32, 0.32]
+                ];
+                let bestFloorY = null;
+                for (const [ox, oz] of sampleOffsets) {
+                    raycaster.set(
+                        new THREE.Vector3(player.pos.x + ox, prevY + 0.55, player.pos.z + oz),
+                        downDir
+                    );
+                    raycaster.far = Math.max(0.85, (prevY - player.pos.y) + 0.75);
+                    const hits = raycaster.intersectObjects(mapMeshes, true);
+                    for (const h of hits) {
+                        if (h.face && h.face.normal.y > 0.35 && h.point.y <= prevY + 0.35) {
+                            if (bestFloorY === null || h.point.y > bestFloorY) {
+                                bestFloorY = h.point.y;
+                            }
+                        }
+                    }
+                }
+
+                if (bestFloorY !== null && player.pos.y <= bestFloorY + 0.06) {
+                    player.pos.y = bestFloorY;
                     player.vel.y = 0;
                     player.onGround = true;
                     player.jumpsUsed = 0;
                 }
             }
 
-            if (player.pos.y < -12.5) {
+            if (player.pos.y <= lavaFloorY + 0.45) {
                 respawnPlayer(true);
                 return;
-            }
-
-            for (const lz of lavaZones) {
-                if (
-                    Math.abs(player.pos.x - lz.x) <= lz.halfW + 0.3 &&
-                    Math.abs(player.pos.z - lz.z) <= lz.halfD + 0.3 &&
-                    player.pos.y <= lz.top &&
-                    player.pos.y >= lz.top - 1.1
-                ) {
-                    respawnPlayer(true);
-                    return;
-                }
-            }
-
-            for (const sp of spinners) {
-                if (Math.abs(player.pos.y - sp.y) < 1.2) {
-                    const angle = sp.pivot.rotation.y;
-                    const cosA = Math.cos(-angle);
-                    const sinA = Math.sin(-angle);
-                    const relX = player.pos.x - sp.x;
-                    const relZ = player.pos.z - sp.z;
-                    const localX = relX * cosA - relZ * sinA;
-                    const localZ = relX * sinA + relZ * cosA;
-                    if (Math.abs(localX) <= sp.length / 2 + 0.25 && Math.abs(localZ) <= 0.48) {
-                        respawnPlayer(true);
-                        return;
-                    }
-                }
             }
 
             for (const en of aerialEnemies) {
@@ -1606,18 +1528,26 @@
 
             for (const cp of checkpoints) {
                 if (cp.activated) continue;
-                if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 2.6) {
+                if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 2.8) {
                     cp.activated = true;
-                    currentSpawn.set(cp.x, cp.y + 0.4, cp.z);
+                    currentSpawn.set(cp.x, cp.y + 0.35, cp.z);
                     cp.pad.material.color.setHex(0xfacc15);
+                    if (cp.stageNum > state.currentLevel) {
+                        state.currentLevel = cp.stageNum;
+                        if (cp.stageNum > state.maxUnlockedLevel) {
+                            state.maxUnlockedLevel = cp.stageNum;
+                        }
+                        saveState();
+                        updateHud();
+                    }
                     sfxCheckpoint();
-                    showToast(`¡${cp.label} activado!`, 1300);
+                    showToast(`¡Checkpoint Etapa ${cp.stageNum}!`, 1400);
                 }
             }
 
             for (const c of coins) {
                 if (c.collected) continue;
-                if (player.pos.distanceTo(new THREE.Vector3(c.x, c.y, c.z)) < 1.65) {
+                if (player.pos.distanceTo(new THREE.Vector3(c.x, c.y, c.z)) < 1.75) {
                     c.collected = true;
                     c.mesh.visible = false;
                     state.coins += 1;
@@ -1625,27 +1555,6 @@
                     updateHud();
                     sfxCoin();
                 }
-            }
-
-            if (portalPos && player.pos.distanceTo(portalPos) < 2.6) {
-                sfxPortal();
-                if (state.currentLevel < TOTAL_LEVELS) {
-                    const nextLvl = state.currentLevel + 1;
-                    state.currentLevel = nextLvl;
-                    if (nextLvl > state.maxUnlockedLevel) {
-                        state.maxUnlockedLevel = nextLvl;
-                    }
-                    saveState();
-                    updateHud();
-                    buildLevel(nextLvl);
-                    showToast(`¡Etapa superada! Pasaste a la Etapa ${nextLvl}`, 2000);
-                } else {
-                    showToast('🏆 ¡Completaste las 30 etapas del Obby Aéreo!', 2600);
-                    state.currentLevel = 1;
-                    saveState();
-                    buildLevel(1);
-                }
-                return;
             }
 
             if (!player.hasCustomModel && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
@@ -1670,7 +1579,7 @@
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 2.1, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.9, player.pos.z);
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
             const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
 
@@ -1701,7 +1610,6 @@
             loadState();
             initThree();
             bindControls();
-            buildLevel(state.currentLevel);
             updateHud();
             animate();
         });
