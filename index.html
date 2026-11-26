@@ -577,7 +577,7 @@
         }
 
         function syncLavaFloorHeight() {
-            if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY - 0.15;
+            if (lavaSeaMesh) lavaSeaMesh.position.y = lavaFloorY - 0.35;
             if (customLavaModel) customLavaModel.position.y = lavaFloorY + customLavaOffsetY;
         }
 
@@ -592,15 +592,19 @@
                     const model = gltf.scene;
                     model.traverse((child) => {
                         if (child.isMesh) {
+                            child.visible = true;
                             child.receiveShadow = true;
                             child.frustumCulled = false;
                             if (child.material) {
                                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                                 mats.forEach((m) => {
+                                    m.visible = true;
+                                    m.opacity = 1;
+                                    m.transparent = false;
                                     m.side = THREE.DoubleSide;
-                                    if (m.emissive && m.emissive.getHex() === 0x000000) {
-                                        m.emissive.setHex(0xea580c);
-                                        m.emissiveIntensity = Math.max(m.emissiveIntensity || 0, 0.45);
+                                    if (m.emissive) {
+                                        if (m.emissive.getHex() === 0x000000) m.emissive.setHex(0xea580c);
+                                        m.emissiveIntensity = Math.max(m.emissiveIntensity || 0, 0.7);
                                     }
                                     if (m.map) {
                                         m.map.encoding = THREE.sRGBEncoding;
@@ -610,6 +614,7 @@
                                         m.emissiveMap.encoding = THREE.sRGBEncoding;
                                         m.needsUpdate = true;
                                     }
+                                    m.needsUpdate = true;
                                 });
                             }
                         }
@@ -624,15 +629,16 @@
                     const scaledBox = new THREE.Box3().setFromObject(model);
                     const center = new THREE.Vector3();
                     scaledBox.getCenter(center);
-                    customLavaOffsetY = -scaledBox.max.y;
+                    customLavaOffsetY = -scaledBox.max.y + 0.25;
                     model.position.set(-center.x, lavaFloorY + customLavaOffsetY, -center.z);
                     customLavaModel = model;
                     sceneryGroup.add(customLavaModel);
-                    showToast('Piso de lava (lava.glb) cargado', 1600);
+                    showToast('Piso de lava (lava.glb) cargado', 1800);
                 },
                 undefined,
                 (err) => {
                     console.warn('No se pudo cargar lava.glb:', err);
+                    showToast('Error al cargar lava.glb (revisa el archivo en el repo)', 2600);
                 }
             );
         }
@@ -650,7 +656,9 @@
             const seaGeo = new THREE.PlaneGeometry(LAVA_FLOOR_SPAN, LAVA_FLOOR_SPAN, 24, 24);
             seaGeo.rotateX(-Math.PI / 2);
             lavaSeaMesh = new THREE.Mesh(seaGeo, lavaSeaMat);
-            lavaSeaMesh.position.set(0, lavaFloorY - 0.15, 0);
+            lavaSeaMesh.position.set(0, lavaFloorY - 0.35, 0);
+            // Oculto temporalmente para comprobar únicamente el modelo lava.glb
+            lavaSeaMesh.visible = false;
             sceneryGroup.add(lavaSeaMesh);
             loadCustomLavaGLB();
         }
