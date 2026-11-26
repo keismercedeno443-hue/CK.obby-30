@@ -123,6 +123,10 @@
                     <span>🗺️</span>
                     <span>Etapas</span>
                 </button>
+                <button id="btn-set-spawn" class="roblox-btn bg-purple-400 hover:bg-purple-300 text-slate-950 px-2.5 py-2 rounded-2xl border-2 border-slate-900/20 text-xs font-extrabold flex items-center gap-1" title="Guardar posición actual como inicio Nivel 1">
+                    <span>📍</span>
+                    <span>Fijar Inicio</span>
+                </button>
             </div>
 
             <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto bg-indigo-950/65 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-indigo-300/35 shadow-lg">
@@ -176,7 +180,8 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v12';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v13';
+        const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -184,13 +189,12 @@
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        // Si quieres que al parar esté completamente quieta sin animaciones de bucle, mantén esto en false
         const USE_STOP_WALKING_GLB = false;
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
 
-        // Coordenadas relativas al mapa para el inicio del Nivel 1 (ajustables si deseas mover el spawn)
-        const LEVEL_1_SPAWN_FACTORS = { x: 0, z: 0.42 };
+        // Apunta hacia el piso morado inferior (zona baja del mapa)
+        const LEVEL_1_SPAWN_FACTORS = { x: 0.0, z: 0.45 };
 
         const state = {
             mode: 'lobby',
@@ -225,6 +229,29 @@
             } catch (err) {
                 console.warn('Error guardando progreso:', err);
             }
+        }
+
+        function loadSavedSpawn() {
+            try {
+                const raw = localStorage.getItem(CUSTOM_SPAWN_KEY);
+                if (!raw) return null;
+                const p = JSON.parse(raw);
+                if (typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
+                    return new THREE.Vector3(p.x, p.y, p.z);
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        function saveCurrentPlayerAsLevel1Spawn() {
+            if (!player.pos) return;
+            const v = new THREE.Vector3(player.pos.x, player.pos.y + 0.1, player.pos.z);
+            try {
+                localStorage.setItem(CUSTOM_SPAWN_KEY, JSON.stringify({ x: v.x, y: v.y, z: v.z }));
+            } catch (e) {}
+            level1Spawn.copy(v);
+            currentSpawn.copy(v);
+            showToast(`Inicio Nivel 1 fijado (${v.x.toFixed(1)}, ${v.y.toFixed(1)}, ${v.z.toFixed(1)})`, 2200);
         }
 
         let audioCtx = null;
@@ -600,12 +627,19 @@
             }
         }
 
-        function findSurfaceHeightAt(x, z, startY = 120) {
+        // Busca superficies de suelo priorizando las más bajas (para evitar caer en plataformas altas/erróneas)
+        function findSurfaceHeightAt(x, z, startY = 120, preferLowest = false) {
             if (!mapLoaded || mapMeshes.length === 0) return null;
             raycaster.set(new THREE.Vector3(x, startY, z), downDir);
-            raycaster.far = 300;
+            raycaster.far = 350;
             const hits = raycaster.intersectObjects(mapMeshes, true);
-            return hits.length > 0 ? hits[0].point.y : null;
+            if (hits.length === 0) return null;
+            if (!preferLowest) return hits[0].point.y;
+            let lowestY = hits[0].point.y;
+            for (const h of hits) {
+                if (h.point.y < lowestY) lowestY = h.point.y;
+            }
+            return lowestY;
         }
 
         function clearEntities() {
@@ -677,27 +711,30 @@
             clearEntities();
             if (!mapBox) return;
             const spanX = mapBox.max.x - mapBox.min.x;
-            const searchTopY = mapBox.max.y + 30;
-            let bestStart = null;
-            const candidateCoords = [
-                [mapBox.max.x * LEVEL_1_SPAWN_FACTORS.x, mapBox.max.z * LEVEL_1_SPAWN_FACTORS.z],
-                [0, mapBox.max.z * 0.35],
-                [0, mapBox.max.z * 0.25],
-                [0, 0],
-                [mapBox.min.x * 0.2, mapBox.max.z * 0.3],
-                [mapBox.max.x * 0.2, mapBox.max.z * 0.3]
-            ];
-            for (const [cx, cz] of candidateCoords) {
-                const sy = findSurfaceHeightAt(cx, cz, searchTopY);
-                if (typeof sy === 'number' && Number.isFinite(sy)) {
-                    bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
-                    break;
+            const searchTopY = mapBox.max.y + 40;
+            const savedSpawn = loadSavedSpawn();
+
+            let bestStart = savedSpawn;
+            if (!bestStart) {
+                const candidateCoords = [
+                    [mapBox.max.x * LEVEL_1_SPAWN_FACTORS.x, mapBox.max.z * LEVEL_1_SPAWN_FACTORS.z],
+                    [0, mapBox.max.z * 0.42],
+                    [mapBox.min.x * 0.15, mapBox.max.z * 0.42],
+                    [mapBox.max.x * 0.15, mapBox.max.z * 0.42],
+                    [0, mapBox.max.z * 0.35]
+                ];
+                for (const [cx, cz] of candidateCoords) {
+                    const sy = findSurfaceHeightAt(cx, cz, searchTopY, true);
+                    if (typeof sy === 'number' && Number.isFinite(sy)) {
+                        bestStart = new THREE.Vector3(cx, sy + 0.35, cz);
+                        break;
+                    }
                 }
             }
             if (!bestStart) {
                 const center = new THREE.Vector3();
                 mapBox.getCenter(center);
-                const sy = findSurfaceHeightAt(center.x, center.z, searchTopY);
+                const sy = findSurfaceHeightAt(center.x, center.z, searchTopY, true);
                 bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.35 : 1.2, center.z);
             }
 
@@ -714,7 +751,7 @@
                 const frac = step / 21;
                 const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.24), frac);
                 const pz = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.72, frac);
-                const surfY = findSurfaceHeightAt(px, pz, searchTopY);
+                const surfY = findSurfaceHeightAt(px, pz, searchTopY, false);
                 if (typeof surfY === 'number') {
                     addCoin(px, surfY + 1.2, pz);
                     if (step % 3 === 0 && nextStageNumber <= TOTAL_LEVELS) {
@@ -744,7 +781,7 @@
             const spanX = mapBox.max.x - mapBox.min.x;
             const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.22);
             const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
-            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 30);
+            const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 40, false);
             const destY = typeof surfY === 'number' ? surfY + 0.35 : level1Spawn.y;
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
@@ -1305,6 +1342,7 @@
             document.getElementById('btn-close-levels')?.addEventListener('click', closeLevelsModal);
             document.getElementById('btn-hud-lobby')?.addEventListener('click', () => setMode('lobby'));
             document.getElementById('btn-hud-levels')?.addEventListener('click', openLevelsModal);
+            document.getElementById('btn-set-spawn')?.addEventListener('click', saveCurrentPlayerAsLevel1Spawn);
             document.getElementById('btn-hud-shoot')?.addEventListener('click', spawnPlayerShot);
 
             const jumpToStage = (targetLvl) => {
@@ -1350,7 +1388,6 @@
                     player.mixer.timeScale = 1;
                     setPlayerAnimation('idle');
                 } else {
-                    // Sin animación idle activa: detiene el mixer para que los pies y cuerpo queden firmes
                     if (player.activeAnimKey && player.actions[player.activeAnimKey]) {
                         player.actions[player.activeAnimKey].stop();
                         player.activeAnimKey = null;
@@ -1379,7 +1416,6 @@
                 targetPitchX = -(0.04 + runRatio * 0.08) * player.animBlend;
                 targetRollZ = strideWave * (0.025 + runRatio * 0.03) * player.animBlend;
             } else {
-                // Completamente quieta y firme en el suelo cuando no se mueve
                 targetPivotY = 0;
                 targetPitchX = 0;
                 targetRollZ = 0;
