@@ -184,11 +184,11 @@
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
-        const USE_STOP_WALKING_GLB = false;
+        // Activa o desactiva el uso de ./stop_walking.glb como animación idle
+        const USE_STOP_WALKING_GLB = true;
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
 
-        // Centrada sobre la plataforma morada y mirando directo hacia la rampa café y losas de colores
         const LEVEL_1_FIXED_SPAWN = { x: 52.0, y: 4.6, z: -21.5 };
         const LEVEL_1_FACING_YAW = -1.89;
 
@@ -938,15 +938,17 @@
                         action.setLoop(loopMode, Infinity);
                         if (loopMode === THREE.LoopOnce) action.clampWhenFinished = true;
                         player.actions[key] = action;
-                        if (key === 'idle' && !player.activeAnimKey) {
+                        if (key === 'idle' && !player.activeAnimKey && Math.hypot(player.vel.x, player.vel.z) <= 0.35 && player.onGround) {
                             setPlayerAnimation('idle');
                         }
                     } catch (err) {
-                        console.warn(`No se pudo enlazar animación ${key}:`, err);
+                        console.warn(`No se pudo enlazar animación ${key} desde ${url}:`, err);
                     }
                 },
                 undefined,
-                () => {}
+                () => {
+                    console.warn(`Archivo de animación no encontrado o inválido: ${url}`);
+                }
             );
         }
 
@@ -1420,10 +1422,6 @@
                 targetPivotY = (0.06 + runRatio * 0.09) * bounceWave * player.animBlend;
                 targetPitchX = -(0.04 + runRatio * 0.08) * player.animBlend;
                 targetRollZ = strideWave * (0.025 + runRatio * 0.03) * player.animBlend;
-            } else {
-                targetPivotY = 0;
-                targetPitchX = 0;
-                targetRollZ = 0;
             }
 
             player.visualPivot.position.y = THREE.MathUtils.lerp(player.visualPivot.position.y, targetPivotY, Math.min(1, dt * 18));
