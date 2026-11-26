@@ -176,9 +176,8 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v1';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v2';
 
-        // Modelo de Amy subido al repositorio
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const ANIM_IDLE_GLB_URL = './Stop%20Walking.glb';
@@ -428,7 +427,7 @@
             animBlend: 0
         };
 
-        const camCtrl = { yaw: 0, pitch: 0.42, distance: 12.5 };
+        const camCtrl = { yaw: 0, pitch: 0.48, distance: 15.5 };
 
         function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
@@ -446,7 +445,7 @@
                     const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
                     const hits = camRay.intersectObjects(mapMeshes, true);
                     if (hits.length > 0) {
-                        const safeDist = Math.max(5.5, hits[0].distance - 0.75);
+                        const safeDist = Math.max(8.5, hits[0].distance - 0.85);
                         desiredPos.copy(target).addScaledVector(dir, safeDist);
                     }
                 }
@@ -456,7 +455,7 @@
 
         function snapCameraToPlayer() {
             if (!camera || !player.pos) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.8, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.35, player.pos.z);
             camera.position.copy(computeCameraDesiredPos(target));
             camera.lookAt(target);
         }
@@ -684,7 +683,7 @@
             for (const [cx, cz] of candidateCoords) {
                 const sy = findSurfaceHeightAt(cx, cz, searchTopY);
                 if (typeof sy === 'number' && Number.isFinite(sy)) {
-                    bestStart = new THREE.Vector3(cx, sy + 0.15, cz);
+                    bestStart = new THREE.Vector3(cx, sy + 0.25, cz);
                     break;
                 }
             }
@@ -692,7 +691,7 @@
                 const center = new THREE.Vector3();
                 mapBox.getCenter(center);
                 const sy = findSurfaceHeightAt(center.x, center.z, searchTopY);
-                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.15 : 1.0, center.z);
+                bestStart = new THREE.Vector3(center.x, typeof sy === 'number' ? sy + 0.25 : 1.2, center.z);
             }
 
             level1Spawn.copy(bestStart);
@@ -739,7 +738,7 @@
             const targetX = Math.sin(stageNum * 0.85) * (spanX * 0.22);
             const targetZ = THREE.MathUtils.lerp(level1Spawn.z, mapBox.min.z * 0.75, frac);
             const surfY = findSurfaceHeightAt(targetX, targetZ, mapBox.max.y + 30);
-            const destY = typeof surfY === 'number' ? surfY + 0.15 : level1Spawn.y;
+            const destY = typeof surfY === 'number' ? surfY + 0.25 : level1Spawn.y;
             currentSpawn.set(targetX, destY, targetZ);
             player.pos.copy(currentSpawn);
             player.vel.set(0, 0, 0);
@@ -863,8 +862,8 @@
                     const amyFallbackMat = new THREE.MeshStandardMaterial({
                         color: 0xf472b6,
                         emissive: 0xdb2777,
-                        emissiveIntensity: 0.2,
-                        roughness: 0.4,
+                        emissiveIntensity: 0.25,
+                        roughness: 0.35,
                         metalness: 0.08,
                         side: THREE.DoubleSide
                     });
@@ -947,7 +946,7 @@
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
-                    showToast(`¡Amy apareció en el juego! (${meshCount} mallas)`, 2000);
+                    showToast(`¡Amy lista en el juego! (${meshCount} mallas)`, 2000);
                 },
                 undefined,
                 (err) => {
@@ -1042,13 +1041,17 @@
 
             clock = new THREE.Clock();
 
-            scene.add(new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.0));
-            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.15);
+            scene.add(new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.1));
+            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.25);
             dirLight.position.set(45, 90, 35);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024;
             dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0xfce7f3, 0.55);
+            fillLight.position.set(-20, 25, 30);
+            scene.add(fillLight);
 
             sceneryGroup = new THREE.Group();
             mapGroup = new THREE.Group();
@@ -1205,7 +1208,7 @@
                         const dy = t.clientY - input.camLastY;
                         if (Math.abs(dx) > 4 || Math.abs(dy) > 4) input.camMoved = true;
                         camCtrl.yaw -= dx * 0.0065;
-                        camCtrl.pitch = Math.max(0.2, Math.min(1.05, camCtrl.pitch + dy * 0.005));
+                        camCtrl.pitch = Math.max(0.22, Math.min(1.05, camCtrl.pitch + dy * 0.005));
                         input.camLastX = t.clientX;
                         input.camLastY = t.clientY;
                     }
@@ -1243,7 +1246,7 @@
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
                 camCtrl.yaw -= dx * 0.0055;
-                camCtrl.pitch = Math.max(0.2, Math.min(1.05, camCtrl.pitch + dy * 0.0045));
+                camCtrl.pitch = Math.max(0.22, Math.min(1.05, camCtrl.pitch + dy * 0.0045));
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
             });
@@ -1578,7 +1581,7 @@
 
         function updateCamera() {
             if (!camera) return;
-            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.8, player.pos.z);
+            const target = new THREE.Vector3(player.pos.x, player.pos.y + 1.35, player.pos.z);
             camera.position.lerp(computeCameraDesiredPos(target), 0.16);
             camera.lookAt(target);
         }
