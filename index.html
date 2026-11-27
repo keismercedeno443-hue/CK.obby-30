@@ -99,7 +99,7 @@
                     PERSONAJE: AMY • OBBY 3D
                 </div>
                 <div id="lobby-online-badge" class="inline-block bg-slate-800 text-amber-300 border border-amber-400/30 font-extrabold text-xs px-3 py-1 rounded-full">
-                    🌐 Desconectado (1)
+                    🌐 Conectando... (1)
                 </div>
             </div>
             <h1 class="roblox-title text-2xl sm:text-4xl font-bold tracking-tight mb-1.5">
@@ -288,9 +288,8 @@
         const STORAGE_KEY = 'obby_roblox_100_multi_v1';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
-        // Cambia esta URL por la de tu servidor Socket.io (ej. https://tu-servidor.onrender.com o http://localhost:3000)
-        const MULTIPLAYER_SERVER_URL = 'http://localhost:3000';
-        const NETWORK_SEND_INTERVAL = 0.065; // ~15 veces por segundo
+        const MULTIPLAYER_SERVER_URL = 'https://obby-servidor.onrender.com';
+        const NETWORK_SEND_INTERVAL = 0.065;
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -2135,7 +2134,6 @@
                 return { group: g, leftLeg, rightLeg, leftArm, rightArm };
             }
 
-            // nova_cielo
             const suitMat = getStuddedMaterial(0x0284c7, 0.35, 0x0ea5e9, 0.25);
             const neonMat = getStuddedMaterial(0x67e8f9, 0.2, 0x22d3ee, 0.75);
             const helmMat = getStuddedMaterial(0xf8fafc, 0.3);
