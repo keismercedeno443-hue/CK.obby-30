@@ -2541,7 +2541,7 @@
 
             document.getElementById('input-room-code')?.addEventListener('change', (e) => {
                 const val = String(e.target.value || '').trim().slice(0, 30);
-                const nextRoom = val || 'familia-obby';
+                const nextRoom = val || 'obby-1';
                 e.target.value = nextRoom;
                 if (nextRoom !== state.roomCode) {
                     state.roomCode = nextRoom;
@@ -2718,7 +2718,7 @@
                 const nameInput = document.getElementById('input-player-name');
                 const roomInput = document.getElementById('input-room-code');
                 const nextName = String(nameInput?.value || state.playerName).trim().slice(0, 20) || 'Jugador';
-                const nextRoom = String(roomInput?.value || state.roomCode).trim().slice(0, 30) || 'familia-obby';
+                const nextRoom = String(roomInput?.value || state.roomCode).trim().slice(0, 30) || 'obby-1';
                 const roomChanged = nextRoom !== state.roomCode;
                 state.playerName = nextName;
                 state.roomCode = nextRoom;
