@@ -343,7 +343,7 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_DIRECT_SCALE = 0.0025;
+        const DRAGON_DIRECT_SCALE = 0.004;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -1200,9 +1200,9 @@
                     let meshCount = 0;
                     let rawSpanText = '?';
                     const configs = [
-                        { radius: 75, baseY: 46, speed: 0.34, phase: 0.2, scaleMult: 0.9, bobAmp: 2.2 },
-                        { radius: 87, baseY: 53, speed: -0.26, phase: 2.3, scaleMult: 1.05, bobAmp: 2.5 },
-                        { radius: 98, baseY: 60, speed: 0.22, phase: 4.4, scaleMult: 1.0, bobAmp: 2.4 }
+                        { radius: 44, baseY: 26, speed: 0.34, phase: 0.2, scaleMult: 1.0, bobAmp: 2.0 },
+                        { radius: 52, baseY: 31, speed: -0.26, phase: 2.3, scaleMult: 1.15, bobAmp: 2.2 },
+                        { radius: 60, baseY: 36, speed: 0.22, phase: 4.4, scaleMult: 1.05, bobAmp: 2.1 }
                     ];
 
                     configs.forEach((cfg, idx) => {
@@ -2950,6 +2950,37 @@
             }
         }
 
+        function isWallBlockedAlongAxis(originX, originY, originZ, dirX, dirZ, checkDist) {
+            if (!mapLoaded || mapMeshes.length === 0) return false;
+            const len = Math.hypot(dirX, dirZ);
+            if (len < 0.0001) return false;
+            const nx = dirX / len;
+            const nz = dirZ / len;
+            const dirVec = new THREE.Vector3(nx, 0, nz);
+            const heights = [originY + 0.75, originY + 1.55, originY + 2.35];
+            const lateralOffsets = [-0.32, 0, 0.32];
+            const perpX = -nz;
+            const perpZ = nx;
+
+            for (const hy of heights) {
+                for (const lat of lateralOffsets) {
+                    const startPt = new THREE.Vector3(
+                        originX + perpX * lat,
+                        hy,
+                        originZ + perpZ * lat
+                    );
+                    const hRay = new THREE.Raycaster(startPt, dirVec, 0.02, checkDist);
+                    const hits = hRay.intersectObjects(mapMeshes, true);
+                    for (const h of hits) {
+                        if (h.face && Math.abs(h.face.normal.y) < 0.45) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
         function updatePlayer(dt, elapsed) {
             if (!player.root) return;
             player.root.visible = true;
@@ -2986,8 +3017,8 @@
             player.vel.y -= 24.0 * dt;
 
             const prevY = player.pos.y;
-            const nextX = player.pos.x + player.vel.x * dt;
-            const nextZ = player.pos.z + player.vel.z * dt;
+            const deltaX = player.vel.x * dt;
+            const deltaZ = player.vel.z * dt;
             const nextY = player.pos.y + player.vel.y * dt;
 
             if (wishDir.lengthSq() > 0.001) {
@@ -2995,21 +3026,18 @@
                 player.yaw = targetYaw;
                 player.root.rotation.y = targetYaw;
 
-                if (mapLoaded && mapMeshes.length > 0 && wishDir.lengthSq() > 0.01) {
-                    const wallRay = new THREE.Raycaster(
-                        new THREE.Vector3(player.pos.x, player.pos.y + 1.45, player.pos.z),
-                        wishDir.clone().normalize()
-                    );
-                    wallRay.far = 0.45;
-                    const wallHits = wallRay.intersectObjects(mapMeshes, true);
-                    const blockingWall = wallHits.find(h => Math.abs(h.face.normal.y) < 0.08);
-                    if (!blockingWall) {
-                        player.pos.x = nextX;
-                        player.pos.z = nextZ;
+                const wallClearance = 0.72;
+                if (Math.abs(deltaX) > 0.0001) {
+                    const stepDistX = Math.abs(deltaX) + wallClearance;
+                    if (!isWallBlockedAlongAxis(player.pos.x, player.pos.y, player.pos.z, deltaX, 0, stepDistX)) {
+                        player.pos.x += deltaX;
                     }
-                } else {
-                    player.pos.x = nextX;
-                    player.pos.z = nextZ;
+                }
+                if (Math.abs(deltaZ) > 0.0001) {
+                    const stepDistZ = Math.abs(deltaZ) + wallClearance;
+                    if (!isWallBlockedAlongAxis(player.pos.x, player.pos.y, player.pos.z, 0, deltaZ, stepDistZ)) {
+                        player.pos.z += deltaZ;
+                    }
                 }
             }
 
@@ -3017,15 +3045,15 @@
             player.onGround = false;
 
             if (mapLoaded && mapMeshes.length > 0 && player.vel.y <= 1.5) {
-                const sampleOffsets = [[0, 0], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]];
+                const sampleOffsets = [[0, 0], [-0.42, -0.42], [0.42, -0.42], [-0.42, 0.42], [0.42, 0.42]];
                 let bestFloorY = null;
                 for (const [ox, oz] of sampleOffsets) {
-                    const rayStartY = prevY + 1.6;
+                    const rayStartY = prevY + 1.75;
                     raycaster.set(new THREE.Vector3(player.pos.x + ox, rayStartY, player.pos.z + oz), downDir);
-                    raycaster.far = Math.max(1.8, (rayStartY - player.pos.y) + 0.8);
+                    raycaster.far = Math.max(2.0, (rayStartY - player.pos.y) + 0.9);
                     const hits = raycaster.intersectObjects(mapMeshes, true);
                     for (const h of hits) {
-                        if (h.point.y <= prevY + 1.1 && (bestFloorY === null || h.point.y > bestFloorY)) {
+                        if (h.point.y <= prevY + 1.25 && (bestFloorY === null || h.point.y > bestFloorY)) {
                             bestFloorY = h.point.y;
                         }
                     }
