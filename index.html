@@ -208,7 +208,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v23';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v24';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
@@ -1153,19 +1153,16 @@
             return cp;
         }
 
-        function revealCheckpointForStage(targetStageNum, announce = false) {
+        function setSingleActiveCheckpoint(targetStageNum) {
             for (const cp of checkpoints) {
-                if (cp.stageNum <= targetStageNum) {
-                    cp.group.visible = true;
-                }
+                const isTarget = !cp.activated && cp.stageNum === targetStageNum;
+                cp.group.visible = isTarget;
             }
             const nextPending = checkpoints.find(cp => !cp.activated && cp.stageNum >= targetStageNum);
             activeCheckpoint = nextPending || null;
             if (activeCheckpoint) {
                 activeCheckpoint.group.visible = true;
-                if (announce) {
-                    showToast(`Checkpoint del Nivel ${activeCheckpoint.stageNum} disponible`, 1600);
-                }
+                if (goalBeacon) goalBeacon.group.visible = false;
             } else if (goalBeacon) {
                 goalBeacon.group.visible = true;
             }
@@ -1217,26 +1214,31 @@
             goalPos = new THREE.Vector3(x, y + 0.5, z);
         }
 
-        function findNearestValidFloor(x, z, startY, searchTopY) {
-            const offsets = [
+        function findSeparatedFloorSpot(idealX, idealZ, prevX, prevZ, prevY, searchTopY, minDistFromPrev = 10.5) {
+            const candidates = [
                 [0, 0],
-                [-3.5, -2.5], [3.5, -2.5], [-3.5, 2.5], [3.5, 2.5],
-                [-7.0, 0], [7.0, 0], [0, -7.0], [0, 7.0]
+                [-5.5, -4.5], [5.5, -4.5], [-5.5, 4.5], [5.5, 4.5],
+                [-10.0, -3.0], [10.0, -3.0], [0, -10.0], [-10.0, -9.0], [10.0, -9.0]
             ];
             let best = null;
             let bestScore = Infinity;
-            for (const [ox, oz] of offsets) {
-                const sx = x + ox;
-                const sz = z + oz;
+
+            for (const [ox, oz] of candidates) {
+                const sx = idealX + ox;
+                const sz = idealZ + oz;
                 const sy = findSurfaceHeightAt(sx, sz, searchTopY, false);
-                if (typeof sy === 'number' && sy > lavaFloorY + 1.0) {
-                    const dist2D = Math.hypot(sx - x, sz - z);
-                    const deltaY = Math.abs(sy - startY) * 1.4;
-                    const score = dist2D + deltaY;
-                    if (score < bestScore) {
-                        bestScore = score;
-                        best = { x: sx, y: sy, z: sz };
-                    }
+                if (typeof sy !== 'number' || sy <= lavaFloorY + 1.0) continue;
+
+                const distFromPrev = Math.hypot(sx - prevX, sz - prevZ);
+                const distFromSpawn = Math.hypot(sx - level1Spawn.x, sz - level1Spawn.z);
+                if (distFromPrev < minDistFromPrev || distFromSpawn < 11.0) continue;
+
+                const distFromIdeal = Math.hypot(sx - idealX, sz - idealZ);
+                const deltaY = Math.abs(sy - prevY) * 1.3;
+                const score = distFromIdeal + deltaY;
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = { x: sx, y: sy, z: sz };
                 }
             }
             return best;
@@ -1274,29 +1276,28 @@
             for (let idx = 1; idx <= totalCheckpoints; idx++) {
                 const stageNum = idx + 1;
                 const frac = idx / (totalCheckpoints + 1);
-                const waveX = Math.sin(idx * 0.78) * (spanX * 0.22);
-                const idealX = THREE.MathUtils.lerp(bestStart.x, waveX, Math.min(1, frac * 1.35));
-                const idealZ = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.76, frac);
+                const waveX = Math.sin(idx * 0.82) * (spanX * 0.24);
+                const idealX = THREE.MathUtils.lerp(bestStart.x, waveX, Math.min(1, frac * 1.4));
+                const idealZ = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.78, frac);
 
-                const spot = findNearestValidFloor(idealX, idealZ, cursorY, searchTopY);
+                const spot = findSeparatedFloorSpot(idealX, idealZ, cursorX, cursorZ, cursorY, searchTopY, 10.5);
                 if (spot) {
                     cursorX = spot.x;
                     cursorY = spot.y;
                     cursorZ = spot.z;
-                    const isFirst = stageNum === 2;
-                    addCheckpoint(cursorX, cursorY, cursorZ, stageNum, isFirst);
+                    addCheckpoint(cursorX, cursorY, cursorZ, stageNum, false);
                     addCoin(cursorX + 1.8, cursorY + 1.2, cursorZ);
                 }
             }
 
-            const endSpot = findNearestValidFloor(cursorX, cursorZ - 6, cursorY, searchTopY);
+            const endSpot = findSeparatedFloorSpot(cursorX, cursorZ - 12, cursorX, cursorZ, cursorY, searchTopY, 9.0);
             if (endSpot) {
                 addFinalGoal(endSpot.x, endSpot.y, endSpot.z);
             } else {
-                addFinalGoal(cursorX, cursorY, cursorZ - 5);
+                addFinalGoal(cursorX, cursorY, cursorZ - 11);
             }
 
-            revealCheckpointForStage(state.currentLevel + 1, false);
+            setSingleActiveCheckpoint(state.currentLevel + 1);
         }
 
         function teleportToStageProgress(stageNum) {
@@ -1307,19 +1308,18 @@
                 player.vel.set(0, 0, 0);
                 player.jumpsUsed = 0;
                 if (player.root) player.root.position.copy(player.pos);
-                revealCheckpointForStage(2, false);
+                setSingleActiveCheckpoint(2);
                 applyFacingAngle(LEVEL_1_FACING_YAW);
                 return;
             }
             const matchingCp = checkpoints.find(cp => cp.stageNum === stageNum);
             if (matchingCp) {
-                matchingCp.group.visible = true;
                 currentSpawn.set(matchingCp.x, matchingCp.y + 0.25, matchingCp.z);
                 player.pos.copy(currentSpawn);
                 player.vel.set(0, 0, 0);
                 player.jumpsUsed = 0;
                 if (player.root) player.root.position.copy(player.pos);
-                revealCheckpointForStage(stageNum + 1, false);
+                setSingleActiveCheckpoint(stageNum + 1);
                 snapCameraToPlayer();
                 return;
             }
@@ -1334,7 +1334,7 @@
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
             if (player.root) player.root.position.copy(player.pos);
-            revealCheckpointForStage(stageNum + 1, false);
+            setSingleActiveCheckpoint(stageNum + 1);
             snapCameraToPlayer();
         }
 
@@ -2215,12 +2215,8 @@
                 if (cp.activated || !cp.group.visible) continue;
                 if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 3.2) {
                     cp.activated = true;
+                    cp.group.visible = false;
                     currentSpawn.set(cp.x, cp.y + 0.25, cp.z);
-                    cp.padMat.color.setHex(0xfacc15);
-                    cp.padMat.emissive.setHex(0xd97706);
-                    cp.ringMat.color.setHex(0xfef08a);
-                    cp.ringMat.emissive.setHex(0xf59e0b);
-                    cp.pillarMat.color.setHex(0xfacc15);
 
                     if (cp.stageNum > state.currentLevel) {
                         state.currentLevel = cp.stageNum;
@@ -2230,8 +2226,8 @@
                     }
 
                     sfxCheckpoint();
-                    revealCheckpointForStage(cp.stageNum + 1, false);
-                    showToast(`¡Checkpoint Nivel ${cp.stageNum}! Sigue la flecha`, 1600);
+                    setSingleActiveCheckpoint(cp.stageNum + 1);
+                    showToast(`¡Nivel ${cp.stageNum} desbloqueado! Sigue la flecha`, 1600);
                 }
             }
 
