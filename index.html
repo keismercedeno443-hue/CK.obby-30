@@ -343,7 +343,7 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 20.0;
+        const DRAGON_TARGET_SPAN = 11.5;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -1199,9 +1199,9 @@
 
                     let meshCount = 0;
                     const configs = [
-                        { radius: 58, baseY: 48, speed: 0.22, phase: 0.2, scale: 1.0, bobAmp: 2.2 },
-                        { radius: 76, baseY: 56, speed: -0.17, phase: 2.3, scale: 1.15, bobAmp: 2.6 },
-                        { radius: 95, baseY: 64, speed: 0.15, phase: 4.4, scale: 1.1, bobAmp: 2.4 }
+                        { radius: 88, baseY: 62, speed: 0.18, phase: 0.2, scale: 0.90, bobAmp: 1.8 },
+                        { radius: 108, baseY: 70, speed: -0.14, phase: 2.3, scale: 1.05, bobAmp: 2.1 },
+                        { radius: 128, baseY: 76, speed: 0.12, phase: 4.4, scale: 0.95, bobAmp: 2.0 }
                     ];
 
                     configs.forEach((cfg) => {
@@ -2892,8 +2892,8 @@
                 d.angle += d.speed * dt;
                 const x = Math.cos(d.angle) * d.radius;
                 const z = Math.sin(d.angle) * d.radius;
-                const flap = Math.sin(elapsed * 6.4 + d.phase);
-                const y = d.baseY + Math.sin(elapsed * 1.6 + d.phase) * d.bobAmp - flap * 0.75;
+                const flap = Math.sin(elapsed * 6.0 + d.phase);
+                const y = d.baseY + Math.sin(elapsed * 1.5 + d.phase) * d.bobAmp - flap * 0.55;
 
                 d.wrapper.position.set(x, y, z);
                 const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
@@ -2903,20 +2903,20 @@
                     d.mixer.update(dt);
                 }
 
-                d.bodyPivot.rotation.z = flap * 0.11;
-                d.bodyPivot.rotation.x = Math.cos(elapsed * 3.2 + d.phase) * 0.08;
+                d.bodyPivot.rotation.z = flap * 0.09;
+                d.bodyPivot.rotation.x = Math.cos(elapsed * 3.0 + d.phase) * 0.07;
 
                 if (d.wingParts.leftWingParts.length > 0 || d.wingParts.rightWingParts.length > 0) {
                     for (const lw of d.wingParts.leftWingParts) {
-                        lw.rotation.z = flap * 0.55;
+                        lw.rotation.z = flap * 0.5;
                     }
                     for (const rw of d.wingParts.rightWingParts) {
-                        rw.rotation.z = -flap * 0.55;
+                        rw.rotation.z = -flap * 0.5;
                     }
                 } else if (d.wingParts.allMeshes.length > 1) {
                     d.wingParts.allMeshes.forEach((m, idx) => {
                         if (idx > 0) {
-                            m.rotation.z = flap * (idx % 2 === 0 ? 0.45 : -0.45);
+                            m.rotation.z = flap * (idx % 2 === 0 ? 0.42 : -0.42);
                         }
                     });
                 }
