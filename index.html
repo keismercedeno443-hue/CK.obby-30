@@ -343,7 +343,7 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_DIRECT_SCALE = 0.004;
+        const DRAGON_TARGET_SPAN = 7.5;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -1199,13 +1199,27 @@
 
                     let meshCount = 0;
                     let rawSpanText = '?';
+                    let normalizedScale = 0.005;
+
+                    const probe = gltf.scene.clone(true);
+                    probe.position.set(0, 0, 0);
+                    probe.rotation.set(0, 0, 0);
+                    probe.scale.setScalar(1);
+                    probe.updateMatrixWorld(true);
+                    const probeBox = new THREE.Box3().setFromObject(probe);
+                    const probeSize = new THREE.Vector3();
+                    probeBox.getSize(probeSize);
+                    const maxRaw = Math.max(probeSize.x, probeSize.y, probeSize.z, 0.001);
+                    rawSpanText = maxRaw.toFixed(1);
+                    normalizedScale = DRAGON_TARGET_SPAN / maxRaw;
+
                     const configs = [
-                        { radius: 44, baseY: 26, speed: 0.34, phase: 0.2, scaleMult: 1.0, bobAmp: 2.0 },
-                        { radius: 52, baseY: 31, speed: -0.26, phase: 2.3, scaleMult: 1.15, bobAmp: 2.2 },
-                        { radius: 60, baseY: 36, speed: 0.22, phase: 4.4, scaleMult: 1.05, bobAmp: 2.1 }
+                        { radius: 82, baseY: 48, speed: 0.30, phase: 0.2, scaleMult: 0.95, bobAmp: 2.0 },
+                        { radius: 94, baseY: 55, speed: -0.24, phase: 2.3, scaleMult: 1.10, bobAmp: 2.2 },
+                        { radius: 105, baseY: 62, speed: 0.20, phase: 4.4, scaleMult: 1.0, bobAmp: 2.1 }
                     ];
 
-                    configs.forEach((cfg, idx) => {
+                    configs.forEach((cfg) => {
                         const wrapper = new THREE.Group();
                         wrapper.userData.isAmbientDragon = true;
                         const bodyPivot = new THREE.Group();
@@ -1239,15 +1253,7 @@
                             }
                         });
 
-                        clone.updateMatrixWorld(true);
-                        if (idx === 0) {
-                            const rawBox = new THREE.Box3().setFromObject(clone);
-                            const rawSize = new THREE.Vector3();
-                            rawBox.getSize(rawSize);
-                            rawSpanText = `${Math.max(rawSize.x, rawSize.y, rawSize.z).toFixed(1)}`;
-                        }
-
-                        const finalScale = DRAGON_DIRECT_SCALE * cfg.scaleMult;
+                        const finalScale = normalizedScale * cfg.scaleMult;
                         clone.scale.setScalar(finalScale);
                         clone.position.set(0, 0, 0);
                         clone.rotation.y = Math.PI / 2;
@@ -1285,7 +1291,7 @@
 
                     const animCount = Array.isArray(gltf.animations) ? gltf.animations.length : 0;
                     const totalPieces = meshCount / Math.max(1, ambientDragons.length);
-                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, raw:${rawSpanText}, esc:${DRAGON_DIRECT_SCALE}, anim:${animCount}, p:${Math.round(totalPieces)})`);
+                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, raw:${rawSpanText}, span:${DRAGON_TARGET_SPAN}, anim:${animCount}, p:${Math.round(totalPieces)})`);
                 },
                 undefined,
                 (err) => {
