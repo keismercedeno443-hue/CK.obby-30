@@ -81,16 +81,6 @@
         <div id="dynamic-joy-knob"></div>
     </div>
 
-    <!-- Detector de estado de dragones -->
-    <div id="dragon-diag" class="fixed bottom-3 left-3 z-50 pointer-events-none bg-slate-950/85 text-amber-300 border border-amber-400/40 px-3 py-1.5 rounded-xl text-[11px] font-bold shadow-lg max-w-[85vw]">
-        Dragón: buscando lava_dragon.glb...
-    </div>
-
-    <!-- Banner de notificación -->
-    <div id="toast-banner" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200">
-        <div id="toast-text" class="bg-slate-950/90 text-amber-300 border border-amber-400/40 px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold shadow-xl text-center"></div>
-    </div>
-
     <!-- Pantalla de Inicio / Lobby -->
     <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-slate-800/75 via-slate-900/80 to-slate-950/90 backdrop-blur-sm">
         <div class="w-full max-w-md bg-slate-900/92 border-2 border-white/20 rounded-3xl p-5 sm:p-6 text-white shadow-2xl text-center">
@@ -294,7 +284,6 @@
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const LAVA_FLOOR_GLB_URL = './lava.glb';
-        const LAVA_DRAGON_GLB_URL = './lava_dragon.glb';
         const BGM_AUDIO_URL = './musica.mp3';
         const BGM_VOLUME = 0.45;
         const ANIM_IDLE_GLB_URL = './stop_walking.glb';
@@ -343,7 +332,6 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 7.5;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -351,11 +339,6 @@
 
         const LEVEL_1_FIXED_SPAWN = { x: 52.0, y: 4.6, z: -21.5 };
         const LEVEL_1_FACING_YAW = -1.89;
-
-        function setDragonDiag(text) {
-            const el = document.getElementById('dragon-diag');
-            if (el) el.textContent = text;
-        }
 
         const state = {
             mode: 'lobby',
@@ -529,21 +512,6 @@
             }
         }
 
-        let toastTimeout = null;
-        function showToast(msg, duration = 2000) {
-            const banner = document.getElementById('toast-banner');
-            const textEl = document.getElementById('toast-text');
-            if (!banner || !textEl) return;
-            textEl.textContent = msg;
-            banner.classList.remove('opacity-0');
-            banner.classList.add('opacity-100');
-            if (toastTimeout) clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                banner.classList.remove('opacity-100');
-                banner.classList.add('opacity-0');
-            }, duration);
-        }
-
         function syncLobbyCharacterUI() {
             const cfg = getActiveCharacterConfig();
             const badge = document.getElementById('lobby-char-badge');
@@ -646,7 +614,6 @@
                     teleportToStageProgress(i);
                     closeLevelsModal();
                     setMode('playing');
-                    showToast(`Etapa ${i} seleccionada`);
                 });
                 grid.appendChild(btn);
             }
@@ -683,7 +650,6 @@
         const checkpoints = [];
         const lavaSplashes = [];
         const skyClouds = [];
-        const ambientDragons = [];
         const studTextureCache = new Map();
         let cachedAmyTemplate = null;
 
@@ -879,7 +845,6 @@
                     level: state.currentLevel
                 });
                 syncLobbyCharacterUI();
-                showToast(`Conectado a la sala "${state.roomCode}"`, 1500);
             });
 
             socket.on('disconnect', () => {
@@ -898,7 +863,6 @@
             socket.on('player_joined', (p) => {
                 if (!p || p.id === socket.id) return;
                 createRemotePlayerEntry(p);
-                showToast(`${p.name || 'Jugador'} se unió a la sala`, 1500);
             });
 
             socket.on('player_moved', (p) => {
@@ -1141,165 +1105,6 @@
                     phase: i * 0.9
                 });
             }
-        }
-
-        function createWingFlapParts(dragonModel) {
-            const leftWingParts = [];
-            const rightWingParts = [];
-            const allMeshes = [];
-            const box = new THREE.Box3().setFromObject(dragonModel);
-            const center = new THREE.Vector3();
-            const size = new THREE.Vector3();
-            box.getCenter(center);
-            box.getSize(size);
-
-            dragonModel.traverse((child) => {
-                const n = (child.name || '').toLowerCase();
-                if (child.isMesh || child.isSkinnedMesh) {
-                    allMeshes.push(child);
-                }
-                if (n.includes('wing_l') || n.includes('leftwing') || n.includes('wing.l') || n.includes('ala_izq')) {
-                    leftWingParts.push(child);
-                } else if (n.includes('wing_r') || n.includes('rightwing') || n.includes('wing.r') || n.includes('ala_der')) {
-                    rightWingParts.push(child);
-                } else if (child.isMesh || child.isSkinnedMesh) {
-                    const partBox = new THREE.Box3().setFromObject(child);
-                    const partCenter = new THREE.Vector3();
-                    partBox.getCenter(partCenter);
-                    const relX = partCenter.x - center.x;
-                    const relY = partCenter.y - center.y;
-                    if (Math.abs(relX) > size.x * 0.14 && relY > -size.y * 0.25) {
-                        if (relX < 0) leftWingParts.push(child);
-                        else rightWingParts.push(child);
-                    }
-                }
-            });
-
-            return { leftWingParts, rightWingParts, allMeshes };
-        }
-
-        function loadAmbientLavaDragons() {
-            if (typeof THREE.GLTFLoader !== 'function' || !environmentGroup) {
-                setDragonDiag('Dragón: GLTFLoader no disponible');
-                return;
-            }
-            setDragonDiag('Dragón: cargando lava_dragon.glb...');
-            const loader = new THREE.GLTFLoader();
-            loader.load(
-                LAVA_DRAGON_GLB_URL,
-                (gltf) => {
-                    if (!gltf || !gltf.scene) {
-                        setDragonDiag('Dragón: archivo vacío o sin escena');
-                        return;
-                    }
-                    for (const d of ambientDragons) {
-                        if (d.wrapper) environmentGroup.remove(d.wrapper);
-                    }
-                    ambientDragons.length = 0;
-
-                    let meshCount = 0;
-                    let rawSpanText = '?';
-                    let normalizedScale = 0.005;
-
-                    const probe = gltf.scene.clone(true);
-                    probe.position.set(0, 0, 0);
-                    probe.rotation.set(0, 0, 0);
-                    probe.scale.setScalar(1);
-                    probe.updateMatrixWorld(true);
-                    const probeBox = new THREE.Box3().setFromObject(probe);
-                    const probeSize = new THREE.Vector3();
-                    probeBox.getSize(probeSize);
-                    const maxRaw = Math.max(probeSize.x, probeSize.y, probeSize.z, 0.001);
-                    rawSpanText = maxRaw.toFixed(1);
-                    normalizedScale = DRAGON_TARGET_SPAN / maxRaw;
-
-                    const configs = [
-                        { radius: 82, baseY: 48, speed: 0.30, phase: 0.2, scaleMult: 0.95, bobAmp: 2.0 },
-                        { radius: 94, baseY: 55, speed: -0.24, phase: 2.3, scaleMult: 1.10, bobAmp: 2.2 },
-                        { radius: 105, baseY: 62, speed: 0.20, phase: 4.4, scaleMult: 1.0, bobAmp: 2.1 }
-                    ];
-
-                    configs.forEach((cfg) => {
-                        const wrapper = new THREE.Group();
-                        wrapper.userData.isAmbientDragon = true;
-                        const bodyPivot = new THREE.Group();
-                        const clone = gltf.scene.clone(true);
-
-                        clone.traverse((child) => {
-                            if (child.isMesh || child.isSkinnedMesh) {
-                                meshCount += 1;
-                                child.visible = true;
-                                child.castShadow = false;
-                                child.receiveShadow = false;
-                                child.frustumCulled = false;
-                                if (child.material) {
-                                    const mats = Array.isArray(child.material) ? child.material : [child.material];
-                                    mats.forEach((m) => {
-                                        m.visible = true;
-                                        m.side = THREE.DoubleSide;
-                                        m.color = new THREE.Color(0x09090b);
-                                        if (m.map) {
-                                            m.map.encoding = THREE.sRGBEncoding;
-                                            m.needsUpdate = true;
-                                        }
-                                        m.emissive = new THREE.Color(0xff4500);
-                                        if (m.map) m.emissiveMap = m.map;
-                                        m.emissiveIntensity = 0.85;
-                                        m.roughness = 0.35;
-                                        m.metalness = 0.25;
-                                        m.needsUpdate = true;
-                                    });
-                                }
-                            }
-                        });
-
-                        const finalScale = normalizedScale * cfg.scaleMult;
-                        clone.scale.setScalar(finalScale);
-                        clone.position.set(0, 0, 0);
-                        clone.rotation.y = Math.PI / 2;
-
-                        bodyPivot.add(clone);
-                        wrapper.add(bodyPivot);
-                        environmentGroup.add(wrapper);
-
-                        let mixer = null;
-                        if (Array.isArray(gltf.animations) && gltf.animations.length > 0) {
-                            mixer = new THREE.AnimationMixer(clone);
-                            const action = mixer.clipAction(gltf.animations[0]);
-                            action.setLoop(THREE.LoopRepeat, Infinity);
-                            action.enabled = true;
-                            action.setEffectiveTimeScale(1.35);
-                            action.setEffectiveWeight(1);
-                            action.play();
-                        }
-
-                        const wingParts = createWingFlapParts(clone);
-                        ambientDragons.push({
-                            wrapper,
-                            bodyPivot,
-                            clone,
-                            mixer,
-                            wingParts,
-                            angle: cfg.phase,
-                            radius: cfg.radius,
-                            baseY: cfg.baseY,
-                            speed: cfg.speed,
-                            phase: cfg.phase,
-                            bobAmp: cfg.bobAmp
-                        });
-                    });
-
-                    const animCount = Array.isArray(gltf.animations) ? gltf.animations.length : 0;
-                    const totalPieces = meshCount / Math.max(1, ambientDragons.length);
-                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, raw:${rawSpanText}, span:${DRAGON_TARGET_SPAN}, anim:${animCount}, p:${Math.round(totalPieces)})`);
-                },
-                undefined,
-                (err) => {
-                    const detail = err && err.message ? err.message : 'revisa si lava_dragon.glb existe en la raíz';
-                    setDragonDiag(`Dragón ERROR: ${detail}`);
-                    console.warn('No se pudo cargar lava_dragon.glb:', err);
-                }
-            );
         }
 
         function createLiquidLavaTexture() {
@@ -1768,10 +1573,7 @@
         }
 
         function loadMainObbyMapGLB() {
-            if (typeof THREE.GLTFLoader !== 'function') {
-                showToast('Error: GLTFLoader no disponible', 2200);
-                return;
-            }
+            if (typeof THREE.GLTFLoader !== 'function') return;
             const loader = new THREE.GLTFLoader();
             loader.load(
                 MAP_GLB_URL,
@@ -1823,7 +1625,6 @@
                 undefined,
                 (err) => {
                     console.warn('Error cargando mapa GLB:', err);
-                    showToast('No se pudo cargar el mapa .glb', 2200);
                 }
             );
         }
@@ -2447,7 +2248,6 @@
 
             buildLavaSea();
             buildDistantDuskClouds();
-            loadAmbientLavaDragons();
             initLavaSplashPool();
             buildRobloxPlayer();
             loadMainObbyMapGLB();
@@ -2473,7 +2273,6 @@
                 snapCameraToPlayer();
             }
             sendPlayerStateNow();
-            if (byHazard) showToast('¡Caíste en la lava! Regresaste al punto seguro', 1400);
         }
 
         const input = {
@@ -2592,7 +2391,6 @@
                 updateHud();
                 closeCharacterModal();
                 sendPlayerStateNow();
-                showToast(`Personaje seleccionado: ${CHARACTER_CATALOG[chosen].name}`, 1400);
             });
 
             const canvas = document.getElementById('game-canvas');
@@ -2767,7 +2565,6 @@
                 saveState();
                 teleportToStageProgress(1);
                 updateHud();
-                showToast('¡Nueva partida desde Nivel 1!', 1500);
             });
 
             const jumpToStage = (targetLvl) => {
@@ -2778,7 +2575,6 @@
                 teleportToStageProgress(clamped);
                 updateHud();
                 sendPlayerStateNow();
-                showToast(`Etapa ${clamped}`, 1100);
             };
             document.getElementById('btn-stage-first')?.addEventListener('click', () => jumpToStage(1));
             document.getElementById('btn-stage-prev')?.addEventListener('click', () => jumpToStage(state.currentLevel - 1));
@@ -2898,40 +2694,6 @@
                 cl.mesh.position.z = Math.sin(cl.angle) * cl.radius;
                 cl.mesh.position.y = cl.baseY + Math.sin(elapsed * 0.65 + cl.phase) * 0.55;
                 cl.mesh.rotation.y = -cl.angle + Math.PI / 2;
-            }
-
-            for (const d of ambientDragons) {
-                d.angle += d.speed * dt;
-                const x = Math.cos(d.angle) * d.radius;
-                const z = Math.sin(d.angle) * d.radius;
-                const flap = Math.sin(elapsed * 7.5 + d.phase);
-                const y = d.baseY + Math.sin(elapsed * 1.8 + d.phase) * d.bobAmp - flap * 0.45;
-
-                d.wrapper.position.set(x, y, z);
-                const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
-                d.wrapper.rotation.y = tangentYaw;
-
-                if (d.mixer) {
-                    d.mixer.update(dt);
-                }
-
-                d.bodyPivot.rotation.z = flap * 0.11 + (d.speed >= 0 ? -0.14 : 0.14);
-                d.bodyPivot.rotation.x = Math.cos(elapsed * 3.4 + d.phase) * 0.08;
-
-                if (d.wingParts.leftWingParts.length > 0 || d.wingParts.rightWingParts.length > 0) {
-                    for (const lw of d.wingParts.leftWingParts) {
-                        lw.rotation.z = flap * 0.55;
-                    }
-                    for (const rw of d.wingParts.rightWingParts) {
-                        rw.rotation.z = -flap * 0.55;
-                    }
-                } else if (d.wingParts.allMeshes.length > 1) {
-                    d.wingParts.allMeshes.forEach((m, idx) => {
-                        if (idx > 0) {
-                            m.rotation.z = flap * (idx % 2 === 0 ? 0.42 : -0.42);
-                        }
-                    });
-                }
             }
 
             for (const cp of checkpoints) {
@@ -3094,7 +2856,6 @@
                     sfxCheckpoint();
                     setSingleActiveCheckpoint(cp.stageNum + 1);
                     sendPlayerStateNow();
-                    showToast(`¡Nivel ${cp.stageNum} desbloqueado! Sigue la flecha`, 1600);
                 }
             }
 
