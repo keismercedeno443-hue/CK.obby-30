@@ -343,7 +343,7 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 11.5;
+        const DRAGON_TARGET_SPAN = 6.2;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -1199,9 +1199,9 @@
 
                     let meshCount = 0;
                     const configs = [
-                        { radius: 88, baseY: 62, speed: 0.18, phase: 0.2, scale: 0.90, bobAmp: 1.8 },
-                        { radius: 108, baseY: 70, speed: -0.14, phase: 2.3, scale: 1.05, bobAmp: 2.1 },
-                        { radius: 128, baseY: 76, speed: 0.12, phase: 4.4, scale: 0.95, bobAmp: 2.0 }
+                        { radius: 105, baseY: 68, speed: 0.28, phase: 0.2, scale: 0.92, bobAmp: 2.4 },
+                        { radius: 126, baseY: 76, speed: -0.22, phase: 2.3, scale: 1.05, bobAmp: 2.8 },
+                        { radius: 145, baseY: 84, speed: 0.19, phase: 4.4, scale: 0.98, bobAmp: 2.6 }
                     ];
 
                     configs.forEach((cfg) => {
@@ -1259,6 +1259,9 @@
                             mixer = new THREE.AnimationMixer(clone);
                             const action = mixer.clipAction(gltf.animations[0]);
                             action.setLoop(THREE.LoopRepeat, Infinity);
+                            action.enabled = true;
+                            action.setEffectiveTimeScale(1.25);
+                            action.setEffectiveWeight(1);
                             action.play();
                         }
 
@@ -2892,8 +2895,8 @@
                 d.angle += d.speed * dt;
                 const x = Math.cos(d.angle) * d.radius;
                 const z = Math.sin(d.angle) * d.radius;
-                const flap = Math.sin(elapsed * 6.0 + d.phase);
-                const y = d.baseY + Math.sin(elapsed * 1.5 + d.phase) * d.bobAmp - flap * 0.55;
+                const flap = Math.sin(elapsed * 7.5 + d.phase);
+                const y = d.baseY + Math.sin(elapsed * 1.8 + d.phase) * d.bobAmp - flap * 0.45;
 
                 d.wrapper.position.set(x, y, z);
                 const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
@@ -2903,15 +2906,15 @@
                     d.mixer.update(dt);
                 }
 
-                d.bodyPivot.rotation.z = flap * 0.09;
-                d.bodyPivot.rotation.x = Math.cos(elapsed * 3.0 + d.phase) * 0.07;
+                d.bodyPivot.rotation.z = flap * 0.11 + (d.speed >= 0 ? -0.14 : 0.14);
+                d.bodyPivot.rotation.x = Math.cos(elapsed * 3.4 + d.phase) * 0.08;
 
                 if (d.wingParts.leftWingParts.length > 0 || d.wingParts.rightWingParts.length > 0) {
                     for (const lw of d.wingParts.leftWingParts) {
-                        lw.rotation.z = flap * 0.5;
+                        lw.rotation.z = flap * 0.55;
                     }
                     for (const rw of d.wingParts.rightWingParts) {
-                        rw.rotation.z = -flap * 0.5;
+                        rw.rotation.z = -flap * 0.55;
                     }
                 } else if (d.wingParts.allMeshes.length > 1) {
                     d.wingParts.allMeshes.forEach((m, idx) => {
