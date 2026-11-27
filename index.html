@@ -343,7 +343,7 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 6.2;
+        const DRAGON_TARGET_SPAN = 14.0;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -1162,7 +1162,7 @@
                     leftWingParts.push(child);
                 } else if (n.includes('wing_r') || n.includes('rightwing') || n.includes('wing.r') || n.includes('ala_der')) {
                     rightWingParts.push(child);
-                } else if (child.isMesh) {
+                } else if (child.isMesh || child.isSkinnedMesh) {
                     const partBox = new THREE.Box3().setFromObject(child);
                     const partCenter = new THREE.Vector3();
                     partBox.getCenter(partCenter);
@@ -1199,9 +1199,9 @@
 
                     let meshCount = 0;
                     const configs = [
-                        { radius: 105, baseY: 68, speed: 0.28, phase: 0.2, scale: 0.92, bobAmp: 2.4 },
-                        { radius: 126, baseY: 76, speed: -0.22, phase: 2.3, scale: 1.05, bobAmp: 2.8 },
-                        { radius: 145, baseY: 84, speed: 0.19, phase: 4.4, scale: 0.98, bobAmp: 2.6 }
+                        { radius: 38, baseY: 20, speed: 0.34, phase: 0.2, scale: 0.92, bobAmp: 2.2 },
+                        { radius: 52, baseY: 26, speed: -0.26, phase: 2.3, scale: 1.05, bobAmp: 2.5 },
+                        { radius: 66, baseY: 32, speed: 0.22, phase: 4.4, scale: 0.98, bobAmp: 2.4 }
                     ];
 
                     configs.forEach((cfg) => {
@@ -1260,7 +1260,7 @@
                             const action = mixer.clipAction(gltf.animations[0]);
                             action.setLoop(THREE.LoopRepeat, Infinity);
                             action.enabled = true;
-                            action.setEffectiveTimeScale(1.25);
+                            action.setEffectiveTimeScale(1.35);
                             action.setEffectiveWeight(1);
                             action.play();
                         }
@@ -1282,7 +1282,8 @@
                     });
 
                     const animCount = Array.isArray(gltf.animations) ? gltf.animations.length : 0;
-                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, piezas:${meshCount}, anim:${animCount})`);
+                    const totalPieces = meshCount / Math.max(1, ambientDragons.length);
+                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, piezas:${Math.round(totalPieces)}, anim:${animCount})`);
                 },
                 undefined,
                 (err) => {
