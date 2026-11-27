@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1e293b">
-    <title>Obby 3D Estilo Roblox — Amy</title>
+    <title>Obby 3D Estilo Roblox — Selector de Personaje</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -86,33 +86,74 @@
 
     <!-- Pantalla de Inicio / Lobby -->
     <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-slate-800/75 via-slate-900/80 to-slate-950/90 backdrop-blur-sm">
-        <div class="w-full max-w-md bg-slate-900/90 border-2 border-white/20 rounded-3xl p-6 text-white shadow-2xl text-center">
-            <div class="inline-block bg-pink-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
+        <div class="w-full max-w-md bg-slate-900/92 border-2 border-white/20 rounded-3xl p-5 sm:p-6 text-white shadow-2xl text-center">
+            <div id="lobby-char-badge" class="inline-block bg-pink-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
                 PERSONAJE: AMY • OBBY 3D
             </div>
-            <h1 class="roblox-title text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+            <h1 class="roblox-title text-2xl sm:text-4xl font-bold tracking-tight mb-1.5">
                 Colorful 100-Stage Obby
             </h1>
-            <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Avanza checkpoint por checkpoint hasta la meta del nivel 100 evitando la lava.
+            <p class="text-slate-300 text-xs sm:text-sm mb-4">
+                Elige tu personaje, avanza checkpoint por checkpoint hasta el nivel 100 y evita la lava.
             </p>
 
-            <div class="grid grid-cols-2 gap-3 mb-5">
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
+            <!-- Apartado Selector de Personaje -->
+            <div class="bg-slate-800/80 border border-white/10 rounded-2xl p-3 mb-4 text-left">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] uppercase tracking-wider text-amber-300 font-extrabold">Elige tu Personaje</span>
+                    <span id="selected-char-label" class="text-xs font-bold text-slate-200">Amy</span>
+                </div>
+                <div id="character-picker" class="grid grid-cols-2 gap-2">
+                    <button type="button" data-char-id="amy" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
+                        <span class="w-7 h-7 rounded-lg bg-pink-500/30 border border-pink-400/50 flex items-center justify-center text-base">🎀</span>
+                        <span class="leading-tight">
+                            <span class="block text-xs font-extrabold text-white">Amy</span>
+                            <span class="block text-[10px] text-slate-300">Clásica</span>
+                        </span>
+                    </button>
+
+                    <button type="button" data-char-id="mi_bebe" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
+                        <span class="w-7 h-7 rounded-lg bg-sky-400/25 border border-sky-300/50 flex items-center justify-center text-base">🍼</span>
+                        <span class="leading-tight">
+                            <span class="block text-xs font-extrabold text-white">Mi Bebé</span>
+                            <span class="block text-[10px] text-slate-300">Tierno</span>
+                        </span>
+                    </button>
+
+                    <button type="button" data-char-id="leo_lava" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
+                        <span class="w-7 h-7 rounded-lg bg-orange-500/30 border border-orange-400/50 flex items-center justify-center text-base">🔥</span>
+                        <span class="leading-tight">
+                            <span class="block text-xs font-extrabold text-white">Leo Lava</span>
+                            <span class="block text-[10px] text-slate-300">Volcánico</span>
+                        </span>
+                    </button>
+
+                    <button type="button" data-char-id="nova_cielo" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
+                        <span class="w-7 h-7 rounded-lg bg-cyan-400/25 border border-cyan-300/50 flex items-center justify-center text-base">⚡</span>
+                        <span class="leading-tight">
+                            <span class="block text-xs font-extrabold text-white">Nova Cielo</span>
+                            <span class="block text-[10px] text-slate-300">Estelar</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-2.5">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Etapa Máxima</div>
                     <div id="lobby-max-level" class="text-lg font-black text-sky-300 mt-0.5">1 / 100</div>
                 </div>
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-2.5">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas</div>
                     <div id="lobby-coins" class="text-lg font-black text-amber-300 mt-0.5">0</div>
                 </div>
             </div>
 
-            <div class="flex flex-col gap-2.5">
+            <div class="flex flex-col gap-2">
                 <button id="btn-play" class="roblox-btn w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-base tracking-wide">
-                    ▶ JUGAR CON AMY
+                    ▶ JUGAR AHORA
                 </button>
-                <button id="btn-open-levels" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
+                <button id="btn-open-levels" class="roblox-btn w-full py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
                     🗺️ Elegir Etapa (1 - 100)
                 </button>
             </div>
@@ -189,7 +230,7 @@
                 ¡Llegaste al Final!
             </h2>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Superaste el recorrido hasta el nivel 100 con Amy. Puedes seguir explorando o reiniciar desde el nivel 1.
+                Superaste el recorrido hasta el nivel 100. Puedes seguir explorando o reiniciar desde el nivel 1.
             </p>
             <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3 mb-5">
                 <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas Totales</div>
@@ -208,7 +249,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v24';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v25';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
@@ -221,8 +262,42 @@
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
 
+        const CHARACTER_CATALOG = {
+            amy: {
+                id: 'amy',
+                name: 'Amy',
+                badge: 'PERSONAJE: AMY • OBBY 3D',
+                badgeClass: 'bg-pink-400 text-slate-950',
+                scale: 1.40,
+                usesAmyGlb: true
+            },
+            mi_bebe: {
+                id: 'mi_bebe',
+                name: 'Mi Bebé',
+                badge: 'PERSONAJE: MI BEBÉ • OBBY 3D',
+                badgeClass: 'bg-sky-300 text-slate-950',
+                scale: 1.18,
+                usesAmyGlb: false
+            },
+            leo_lava: {
+                id: 'leo_lava',
+                name: 'Leo Lava',
+                badge: 'PERSONAJE: LEO LAVA • OBBY 3D',
+                badgeClass: 'bg-orange-400 text-slate-950',
+                scale: 1.38,
+                usesAmyGlb: false
+            },
+            nova_cielo: {
+                id: 'nova_cielo',
+                name: 'Nova Cielo',
+                badge: 'PERSONAJE: NOVA CIELO • OBBY 3D',
+                badgeClass: 'bg-cyan-300 text-slate-950',
+                scale: 1.38,
+                usesAmyGlb: false
+            }
+        };
+
         const USE_STOP_WALKING_GLB = true;
-        const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
         const DRAGON_TARGET_SPAN = 20.0;
@@ -241,12 +316,17 @@
 
         const state = {
             mode: 'lobby',
+            selectedCharacter: 'amy',
             currentLevel: 1,
             maxUnlockedLevel: 1,
             coins: 0,
             soundEnabled: true,
             wonGame: false
         };
+
+        function getActiveCharacterConfig() {
+            return CHARACTER_CATALOG[state.selectedCharacter] || CHARACTER_CATALOG.amy;
+        }
 
         function requestImmersiveFullscreen() {
             const el = document.documentElement;
@@ -264,6 +344,9 @@
                 const raw = localStorage.getItem(STORAGE_KEY);
                 if (!raw) return;
                 const parsed = JSON.parse(raw);
+                if (typeof parsed.selectedCharacter === 'string' && CHARACTER_CATALOG[parsed.selectedCharacter]) {
+                    state.selectedCharacter = parsed.selectedCharacter;
+                }
                 if (typeof parsed.currentLevel === 'number') state.currentLevel = Math.max(1, Math.min(TOTAL_LEVELS, parsed.currentLevel));
                 if (typeof parsed.maxUnlockedLevel === 'number') state.maxUnlockedLevel = Math.max(1, Math.min(TOTAL_LEVELS, parsed.maxUnlockedLevel));
                 if (typeof parsed.coins === 'number') state.coins = Math.max(0, Math.floor(parsed.coins));
@@ -277,6 +360,7 @@
         function saveState() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    selectedCharacter: state.selectedCharacter,
                     currentLevel: state.currentLevel,
                     maxUnlockedLevel: state.maxUnlockedLevel,
                     coins: state.coins,
@@ -398,6 +482,29 @@
             }, duration);
         }
 
+        function syncCharacterPickerUI() {
+            const cfg = getActiveCharacterConfig();
+            const badge = document.getElementById('lobby-char-badge');
+            const label = document.getElementById('selected-char-label');
+            if (badge) {
+                badge.className = `inline-block ${cfg.badgeClass} font-black text-xs px-3 py-1 rounded-full mb-2`;
+                badge.textContent = cfg.badge;
+            }
+            if (label) {
+                label.textContent = cfg.name;
+            }
+            const buttons = document.querySelectorAll('.char-option');
+            buttons.forEach((btn) => {
+                const charId = btn.getAttribute('data-char-id');
+                const isSelected = charId === state.selectedCharacter;
+                btn.className = `char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition ${
+                    isSelected
+                        ? 'bg-amber-400/20 border-amber-300 ring-2 ring-amber-300/60'
+                        : 'bg-slate-900/75 border-white/10 hover:border-white/30'
+                }`;
+            });
+        }
+
         function updateHud() {
             document.getElementById('hud-level-text').textContent = String(state.currentLevel);
             document.getElementById('hud-coins-text').textContent = String(state.coins);
@@ -407,6 +514,7 @@
             if (vc) vc.textContent = String(state.coins);
             const soundBtn = document.getElementById('btn-hud-sound');
             if (soundBtn) soundBtn.textContent = state.soundEnabled ? '🔊' : '🔇';
+            syncCharacterPickerUI();
         }
 
         function openVictoryModal() {
@@ -519,7 +627,7 @@
             visualPivot: null,
             fallbackGroup: null,
             customModel: null,
-            baseScale: AMY_DIRECT_SCALE,
+            baseScale: 1.40,
             mixer: null,
             actions: { idle: null, run: null, jump: null },
             activeAnimKey: null,
@@ -609,8 +717,8 @@
             camera.lookAt(target);
         }
 
-        function getStuddedMaterial(hexColor, roughness = 0.55) {
-            const key = `${hexColor}_${roughness}`;
+        function getStuddedMaterial(hexColor, roughness = 0.55, emissiveHex = null, emissiveIntensity = 0) {
+            const key = `${hexColor}_${roughness}_${emissiveHex || 'none'}_${emissiveIntensity}`;
             let tex = studTextureCache.get(key);
             if (!tex) {
                 const canvas = document.createElement('canvas');
@@ -644,7 +752,15 @@
                 tex.encoding = THREE.sRGBEncoding;
                 studTextureCache.set(key, tex);
             }
-            const mat = new THREE.MeshStandardMaterial({ map: tex.clone(), roughness, metalness: 0.08 });
+            const mat = new THREE.MeshStandardMaterial({
+                map: tex.clone(),
+                roughness,
+                metalness: 0.12
+            });
+            if (emissiveHex !== null && emissiveIntensity > 0) {
+                mat.emissive = new THREE.Color(emissiveHex);
+                mat.emissiveIntensity = emissiveIntensity;
+            }
             mat.map.needsUpdate = true;
             return mat;
         }
@@ -1542,22 +1658,18 @@
 
                     if (meshCount === 0) return;
 
+                    const cfg = getActiveCharacterConfig();
                     model.position.set(0, 0, 0);
                     model.rotation.set(0, Math.PI, 0);
-                    model.scale.setScalar(AMY_DIRECT_SCALE);
+                    model.scale.setScalar(cfg.scale);
                     model.updateMatrixWorld(true);
 
-                    player.baseScale = AMY_DIRECT_SCALE;
+                    player.baseScale = cfg.scale;
                     if (player.customModel) player.visualPivot.remove(player.customModel);
 
                     player.customModel = model;
                     player.hasCustomModel = true;
                     player.visualPivot.add(model);
-
-                    if (player.fallbackGroup) {
-                        player.fallbackGroup.visible = false;
-                        player.fallbackGroup.traverse(c => { c.visible = false; });
-                    }
 
                     player.mixer = new THREE.AnimationMixer(model);
 
@@ -1566,86 +1678,210 @@
                     }
                     loadExternalAnimationClip(ANIM_RUN_GLB_URL, 'run', THREE.LoopRepeat);
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
+
+                    applySelectedCharacterAppearance();
                 },
                 undefined,
                 (err) => {
                     console.warn('No se pudo cargar Amy.glb:', err);
-                    if (player.fallbackGroup) {
-                        player.fallbackGroup.visible = true;
-                        player.fallbackGroup.traverse(c => { c.visible = true; });
-                        player.fallbackGroup.scale.setScalar(AMY_DIRECT_SCALE);
-                    }
+                    applySelectedCharacterAppearance();
                 }
             );
+        }
+
+        function createStylizedRobloxCharacterGroup(charId) {
+            const g = new THREE.Group();
+
+            if (charId === 'mi_bebe') {
+                const onesieMat = getStuddedMaterial(0x7dd3fc, 0.45);
+                const bibMat = getStuddedMaterial(0xfef08a, 0.4);
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.42 });
+                const bonnetMat = getStuddedMaterial(0xf9a8d4, 0.45);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.05, 0.72), onesieMat);
+                torso.position.y = 1.35;
+                torso.castShadow = true;
+                g.add(torso);
+
+                const bib = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.52, 0.14), bibMat);
+                bib.position.set(0, 1.56, -0.39);
+                g.add(bib);
+
+                const head = new THREE.Mesh(new THREE.BoxGeometry(1.08, 1.05, 1.02), skinMat);
+                head.position.y = 2.42;
+                head.castShadow = true;
+                g.add(head);
+
+                const bonnet = new THREE.Mesh(new THREE.BoxGeometry(1.14, 0.34, 1.08), bonnetMat);
+                bonnet.position.set(0, 2.94, 0.02);
+                g.add(bonnet);
+
+                const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.08), eyeMat);
+                eyeL.position.set(-0.26, 2.46, -0.52);
+                const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.08), eyeMat);
+                eyeR.position.set(0.26, 2.46, -0.52);
+                g.add(eyeL, eyeR);
+
+                const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.82, 0.52), onesieMat);
+                leftLeg.position.set(-0.28, 0.41, 0);
+                leftLeg.castShadow = true;
+                g.add(leftLeg);
+
+                const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.82, 0.52), onesieMat);
+                rightLeg.position.set(0.28, 0.41, 0);
+                rightLeg.castShadow = true;
+                g.add(rightLeg);
+
+                const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.85, 0.42), skinMat);
+                leftArm.position.set(-0.76, 1.45, 0);
+                g.add(leftArm);
+
+                const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.85, 0.42), skinMat);
+                rightArm.position.set(0.76, 1.45, 0);
+                g.add(rightArm);
+
+                return { group: g, leftLeg, rightLeg, leftArm, rightArm };
+            }
+
+            if (charId === 'leo_lava') {
+                const armorMat = getStuddedMaterial(0x18181b, 0.35, 0xea580c, 0.35);
+                const coreMat = getStuddedMaterial(0xff4500, 0.25, 0xff5722, 0.85);
+                const crestMat = getStuddedMaterial(0xfacc15, 0.3, 0xf59e0b, 0.5);
+
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(1.16, 1.24, 0.68), armorMat);
+                torso.position.y = 1.65;
+                torso.castShadow = true;
+                g.add(torso);
+
+                const lavaChest = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.64, 0.12), coreMat);
+                lavaChest.position.set(0, 1.7, -0.35);
+                g.add(lavaChest);
+
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.88, 0.88), armorMat);
+                head.position.y = 2.72;
+                head.castShadow = true;
+                g.add(head);
+
+                const visor = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.22, 0.12), coreMat);
+                visor.position.set(0, 2.75, -0.45);
+                g.add(visor);
+
+                const crown = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.26, 0.96), crestMat);
+                crown.position.set(0, 3.24, 0);
+                g.add(crown);
+
+                const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), armorMat);
+                leftLeg.position.set(-0.28, 0.52, 0);
+                leftLeg.castShadow = true;
+                g.add(leftLeg);
+
+                const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), armorMat);
+                rightLeg.position.set(0.28, 0.52, 0);
+                rightLeg.castShadow = true;
+                g.add(rightLeg);
+
+                const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.44, 1.05, 0.48), coreMat);
+                leftArm.position.set(-0.8, 1.68, 0);
+                g.add(leftArm);
+
+                const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.44, 1.05, 0.48), coreMat);
+                rightArm.position.set(0.8, 1.68, 0);
+                g.add(rightArm);
+
+                return { group: g, leftLeg, rightLeg, leftArm, rightArm };
+            }
+
+            // nova_cielo
+            const suitMat = getStuddedMaterial(0x0284c7, 0.35, 0x0ea5e9, 0.25);
+            const neonMat = getStuddedMaterial(0x67e8f9, 0.2, 0x22d3ee, 0.75);
+            const helmMat = getStuddedMaterial(0xf8fafc, 0.3);
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.12, 1.22, 0.64), suitMat);
+            torso.position.y = 1.65;
+            torso.castShadow = true;
+            g.add(torso);
+
+            const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.95, 0.12), neonMat);
+            stripe.position.set(0, 1.66, -0.33);
+            g.add(stripe);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.88, 0.88), helmMat);
+            head.position.y = 2.72;
+            head.castShadow = true;
+            g.add(head);
+
+            const visor = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.28, 0.14), neonMat);
+            visor.position.set(0, 2.74, -0.45);
+            g.add(visor);
+
+            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.48, 1.05, 0.54), suitMat);
+            leftLeg.position.set(-0.28, 0.52, 0);
+            leftLeg.castShadow = true;
+            g.add(leftLeg);
+
+            const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.48, 1.05, 0.54), suitMat);
+            rightLeg.position.set(0.28, 0.52, 0);
+            rightLeg.castShadow = true;
+            g.add(rightLeg);
+
+            const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), neonMat);
+            leftArm.position.set(-0.78, 1.68, 0);
+            g.add(leftArm);
+
+            const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), neonMat);
+            rightArm.position.set(0.78, 1.68, 0);
+            g.add(rightArm);
+
+            return { group: g, leftLeg, rightLeg, leftArm, rightArm };
+        }
+
+        function applySelectedCharacterAppearance() {
+            const cfg = getActiveCharacterConfig();
+            player.baseScale = cfg.scale;
+
+            if (cfg.usesAmyGlb && player.hasCustomModel && player.customModel) {
+                player.customModel.visible = true;
+                player.customModel.scale.setScalar(cfg.scale);
+                if (player.fallbackGroup) {
+                    player.fallbackGroup.visible = false;
+                    player.fallbackGroup.traverse(c => { c.visible = false; });
+                }
+                return;
+            }
+
+            if (player.customModel) {
+                player.customModel.visible = false;
+            }
+
+            if (!player.visualPivot) return;
+            if (player.fallbackGroup) {
+                player.visualPivot.remove(player.fallbackGroup);
+            }
+
+            const built = createStylizedRobloxCharacterGroup(cfg.id);
+            player.fallbackGroup = built.group;
+            player.leftLeg = built.leftLeg;
+            player.rightLeg = built.rightLeg;
+            player.leftArm = built.leftArm;
+            player.rightArm = built.rightArm;
+            player.fallbackGroup.visible = true;
+            player.fallbackGroup.scale.setScalar(cfg.scale);
+            player.visualPivot.add(player.fallbackGroup);
         }
 
         function buildRobloxPlayer() {
             const root = new THREE.Group();
             const visualPivot = new THREE.Group();
-            const fallbackGroup = new THREE.Group();
 
-            const shirtMat = getStuddedMaterial(0xec4899, 0.5);
-            const pantsMat = getStuddedMaterial(0x1e293b, 0.6);
-            const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.45 });
-            const capMat = getStuddedMaterial(0xf43f5e, 0.5);
-
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.62), shirtMat);
-            torso.position.y = 1.65;
-            torso.castShadow = true;
-            torso.frustumCulled = false;
-            fallbackGroup.add(torso);
-
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), skinMat);
-            head.position.y = 2.7;
-            head.castShadow = true;
-            head.frustumCulled = false;
-            fallbackGroup.add(head);
-
-            const cap = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.34, 0.96), capMat);
-            cap.position.set(0, 3.12, -0.04);
-            cap.frustumCulled = false;
-            fallbackGroup.add(cap);
-
-            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
-            leftLeg.position.set(-0.28, 0.52, 0);
-            leftLeg.castShadow = true;
-            leftLeg.frustumCulled = false;
-            fallbackGroup.add(leftLeg);
-
-            const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.05, 0.56), pantsMat);
-            rightLeg.position.set(0.28, 0.52, 0);
-            rightLeg.castShadow = true;
-            rightLeg.frustumCulled = false;
-            fallbackGroup.add(rightLeg);
-
-            const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
-            leftArm.position.set(-0.78, 1.68, 0);
-            leftArm.castShadow = true;
-            leftArm.frustumCulled = false;
-            fallbackGroup.add(leftArm);
-
-            const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.46), skinMat);
-            rightArm.position.set(0.78, 1.68, 0);
-            rightArm.castShadow = true;
-            rightArm.frustumCulled = false;
-            fallbackGroup.add(rightArm);
-
-            fallbackGroup.visible = false;
-            fallbackGroup.scale.setScalar(AMY_DIRECT_SCALE);
-            visualPivot.add(fallbackGroup);
             root.add(visualPivot);
-
             player.root = root;
             player.visualPivot = visualPivot;
-            player.fallbackGroup = fallbackGroup;
-            player.leftLeg = leftLeg;
-            player.rightLeg = rightLeg;
-            player.leftArm = leftArm;
-            player.rightArm = rightArm;
             root.position.copy(player.pos);
             root.rotation.y = player.yaw;
             scene.add(root);
 
+            applySelectedCharacterAppearance();
             loadAmyPlayerGLB();
         }
 
@@ -1777,6 +2013,18 @@
                 }
             });
             window.addEventListener('keyup', (e) => { input.keys[e.code] = false; });
+
+            document.querySelectorAll('.char-option').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const charId = btn.getAttribute('data-char-id');
+                    if (!charId || !CHARACTER_CATALOG[charId]) return;
+                    state.selectedCharacter = charId;
+                    saveState();
+                    applySelectedCharacterAppearance();
+                    updateHud();
+                    showToast(`Personaje: ${CHARACTER_CATALOG[charId].name}`, 1300);
+                });
+            });
 
             const canvas = document.getElementById('game-canvas');
             const maxRadius = 42;
@@ -1912,6 +2160,7 @@
             document.getElementById('btn-play')?.addEventListener('click', () => {
                 ensureAudioContext();
                 requestImmersiveFullscreen();
+                applySelectedCharacterAppearance();
                 teleportToStageProgress(state.currentLevel || 1);
                 setMode('playing');
             });
@@ -1961,12 +2210,15 @@
 
         function updateProceduralMovementAnimation(dt, horizSpeed) {
             if (!player.visualPivot) return;
+            const cfg = getActiveCharacterConfig();
+            const usesGlbAnim = cfg.usesAmyGlb && player.hasCustomModel && player.mixer;
+
             const isMoving = horizSpeed > 0.35;
             const runRatio = Math.max(0, Math.min(1, (horizSpeed - 1.5) / 6.5));
             const targetBlend = isMoving ? 1 : 0;
             player.animBlend = THREE.MathUtils.lerp(player.animBlend, targetBlend, Math.min(1, dt * 14));
 
-            if (player.hasCustomModel && player.mixer) {
+            if (usesGlbAnim) {
                 if (!player.onGround && player.actions.jump) {
                     player.mixer.timeScale = 1;
                     setPlayerAnimation('jump');
@@ -2012,7 +2264,7 @@
             player.visualPivot.rotation.x = THREE.MathUtils.lerp(player.visualPivot.rotation.x, targetPitchX, Math.min(1, dt * 18));
             player.visualPivot.rotation.z = THREE.MathUtils.lerp(player.visualPivot.rotation.z, targetRollZ, Math.min(1, dt * 18));
 
-            if (!player.hasCustomModel && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
+            if (!usesGlbAnim && player.leftLeg && player.rightLeg && player.leftArm && player.rightArm) {
                 if (!player.onGround) {
                     player.leftLeg.rotation.x = THREE.MathUtils.lerp(player.leftLeg.rotation.x, 0.45, Math.min(1, dt * 14));
                     player.rightLeg.rotation.x = THREE.MathUtils.lerp(player.rightLeg.rotation.x, -0.35, Math.min(1, dt * 14));
@@ -2254,11 +2506,6 @@
             }
 
             updateProceduralMovementAnimation(dt, Math.hypot(player.vel.x, player.vel.z));
-            if (player.customModel) {
-                player.customModel.visible = true;
-                player.customModel.scale.setScalar(AMY_DIRECT_SCALE);
-                if (player.fallbackGroup) player.fallbackGroup.visible = false;
-            }
             player.root.position.copy(player.pos);
         }
 
