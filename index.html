@@ -6,10 +6,11 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1e293b">
-    <title>Obby 3D Estilo Roblox — Vista Previa 3D de Personaje</title>
+    <title>Obby 3D Estilo Roblox — Multijugador</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         html, body {
@@ -92,38 +93,55 @@
 
     <!-- Pantalla de Inicio / Lobby -->
     <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-slate-800/75 via-slate-900/80 to-slate-950/90 backdrop-blur-sm">
-        <div class="w-full max-w-md bg-slate-900/92 border-2 border-white/20 rounded-3xl p-6 text-white shadow-2xl text-center">
-            <div id="lobby-char-badge" class="inline-block bg-pink-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
-                PERSONAJE: AMY • OBBY 3D
+        <div class="w-full max-w-md bg-slate-900/92 border-2 border-white/20 rounded-3xl p-5 sm:p-6 text-white shadow-2xl text-center">
+            <div class="flex items-center justify-center gap-2 flex-wrap mb-2">
+                <div id="lobby-char-badge" class="inline-block bg-pink-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full">
+                    PERSONAJE: AMY • OBBY 3D
+                </div>
+                <div id="lobby-online-badge" class="inline-block bg-slate-800 text-amber-300 border border-amber-400/30 font-extrabold text-xs px-3 py-1 rounded-full">
+                    🌐 Desconectado (1)
+                </div>
             </div>
-            <h1 class="roblox-title text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+            <h1 class="roblox-title text-2xl sm:text-4xl font-bold tracking-tight mb-1.5">
                 Colorful 100-Stage Obby
             </h1>
-            <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Avanza checkpoint por checkpoint hasta la meta del nivel 100 evitando la lava.
+            <p class="text-slate-300 text-xs sm:text-sm mb-4">
+                Entren todos a la misma sala para verse y jugar juntos hasta el nivel 100.
             </p>
 
-            <div class="grid grid-cols-2 gap-3 mb-5">
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
+            <!-- Nombre y Sala Multijugador -->
+            <div class="grid grid-cols-2 gap-2.5 mb-4 text-left">
+                <div>
+                    <label for="input-player-name" class="block text-[10px] uppercase tracking-wider text-slate-400 font-extrabold mb-1">Tu Nombre</label>
+                    <input id="input-player-name" type="text" maxlength="20" placeholder="Ej. Papá" class="w-full bg-slate-800 border border-white/15 focus:border-amber-300 outline-none rounded-xl px-3 py-2 text-xs font-bold text-white" />
+                </div>
+                <div>
+                    <label for="input-room-code" class="block text-[10px] uppercase tracking-wider text-slate-400 font-extrabold mb-1">Sala</label>
+                    <input id="input-room-code" type="text" maxlength="30" placeholder="familia-obby" class="w-full bg-slate-800 border border-white/15 focus:border-sky-300 outline-none rounded-xl px-3 py-2 text-xs font-bold text-white" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-2.5">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Etapa Máxima</div>
                     <div id="lobby-max-level" class="text-lg font-black text-sky-300 mt-0.5">1 / 100</div>
                 </div>
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-2.5">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas</div>
                     <div id="lobby-coins" class="text-lg font-black text-amber-300 mt-0.5">0</div>
                 </div>
             </div>
 
-            <div class="flex flex-col gap-2.5">
+            <div class="flex flex-col gap-2">
                 <button id="btn-play" class="roblox-btn w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-base tracking-wide">
-                    ▶ JUGAR AHORA
+                    ▶ JUGAR JUNTOS
                 </button>
-                <button id="btn-open-character" class="roblox-btn w-full py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2">
+                <button id="btn-open-character" class="roblox-btn w-full py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2">
                     <span>🎭</span>
                     <span>Elegir Personaje</span>
                     <span id="lobby-selected-char-pill" class="px-2 py-0.5 rounded-full bg-slate-950/15 text-xs font-black">Amy</span>
                 </button>
-                <button id="btn-open-levels" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
+                <button id="btn-open-levels" class="roblox-btn w-full py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
                     🗺️ Elegir Etapa (1 - 100)
                 </button>
             </div>
@@ -143,7 +161,6 @@
                 </button>
             </div>
 
-            <!-- Escenario 3D de Vista Previa -->
             <div class="relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden border border-white/15 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 mb-3">
                 <canvas id="char-preview-canvas"></canvas>
                 <div class="absolute bottom-2.5 left-1/2 -translate-x-1/2 pointer-events-none bg-slate-950/80 border border-white/15 px-3.5 py-1 rounded-full text-xs font-extrabold text-amber-300">
@@ -151,7 +168,6 @@
                 </div>
             </div>
 
-            <!-- Botones de Personajes -->
             <div class="grid grid-cols-2 gap-2 mb-4">
                 <button type="button" data-preview-char="amy" class="preview-char-btn roblox-btn py-2.5 px-3 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5">
                     <span>🎀</span>
@@ -189,6 +205,9 @@
                     <span>🗺️</span>
                     <span>Etapas</span>
                 </button>
+                <div id="hud-online-pill" class="bg-slate-900/85 text-emerald-300 border border-emerald-400/35 px-3 py-2 rounded-2xl text-xs font-extrabold">
+                    👥 1
+                </div>
                 <button id="btn-hud-fullscreen" class="roblox-btn bg-slate-800/85 hover:bg-slate-700 text-white px-2.5 py-2 rounded-2xl border border-white/20 text-xs font-extrabold" title="Pantalla completa">
                     ⛶
                 </button>
@@ -266,8 +285,12 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v26';
+        const STORAGE_KEY = 'obby_roblox_100_multi_v1';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
+
+        // Cambia esta URL por la de tu servidor Socket.io (ej. https://tu-servidor.onrender.com o http://localhost:3000)
+        const MULTIPLAYER_SERVER_URL = 'http://localhost:3000';
+        const NETWORK_SEND_INTERVAL = 0.065; // ~15 veces por segundo
 
         const PLAYER_GLB_URL = './Amy.glb';
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
@@ -337,6 +360,8 @@
 
         const state = {
             mode: 'lobby',
+            playerName: 'Papá',
+            roomCode: 'familia-obby',
             selectedCharacter: 'amy',
             previewCharacter: 'amy',
             currentLevel: 1,
@@ -346,12 +371,15 @@
             wonGame: false
         };
 
+        const netState = {
+            socket: null,
+            connected: false,
+            sendTimer: 0,
+            remotePlayers: new Map()
+        };
+
         function getActiveCharacterConfig() {
             return CHARACTER_CATALOG[state.selectedCharacter] || CHARACTER_CATALOG.amy;
-        }
-
-        function getPreviewCharacterConfig() {
-            return CHARACTER_CATALOG[state.previewCharacter] || getActiveCharacterConfig();
         }
 
         function requestImmersiveFullscreen() {
@@ -370,6 +398,12 @@
                 const raw = localStorage.getItem(STORAGE_KEY);
                 if (!raw) return;
                 const parsed = JSON.parse(raw);
+                if (typeof parsed.playerName === 'string' && parsed.playerName.trim()) {
+                    state.playerName = parsed.playerName.trim().slice(0, 20);
+                }
+                if (typeof parsed.roomCode === 'string' && parsed.roomCode.trim()) {
+                    state.roomCode = parsed.roomCode.trim().slice(0, 30);
+                }
                 if (typeof parsed.selectedCharacter === 'string' && CHARACTER_CATALOG[parsed.selectedCharacter]) {
                     state.selectedCharacter = parsed.selectedCharacter;
                     state.previewCharacter = parsed.selectedCharacter;
@@ -387,6 +421,8 @@
         function saveState() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    playerName: state.playerName,
+                    roomCode: state.roomCode,
                     selectedCharacter: state.selectedCharacter,
                     currentLevel: state.currentLevel,
                     maxUnlockedLevel: state.maxUnlockedLevel,
@@ -514,11 +550,22 @@
             const badge = document.getElementById('lobby-char-badge');
             const pill = document.getElementById('lobby-selected-char-pill');
             if (badge) {
-                badge.className = `inline-block ${cfg.badgeClass} font-black text-xs px-3 py-1 rounded-full mb-2`;
+                badge.className = `inline-block ${cfg.badgeClass} font-black text-xs px-3 py-1 rounded-full`;
                 badge.textContent = cfg.badge;
             }
             if (pill) {
                 pill.textContent = cfg.name;
+            }
+            const totalPlayers = 1 + netState.remotePlayers.size;
+            const onlineBadge = document.getElementById('lobby-online-badge');
+            if (onlineBadge) {
+                onlineBadge.textContent = netState.connected
+                    ? `🟢 Sala: ${state.roomCode} (${totalPlayers})`
+                    : `🌐 Local (${totalPlayers})`;
+            }
+            const hudOnline = document.getElementById('hud-online-pill');
+            if (hudOnline) {
+                hudOnline.textContent = `👥 ${totalPlayers}`;
             }
         }
 
@@ -564,6 +611,7 @@
                     snapCameraToPlayer();
                 }
                 startSuspenseMusic();
+                sendPlayerStateNow();
             } else {
                 lobbyEl.classList.remove('hidden');
                 hudEl.classList.add('hidden');
@@ -615,7 +663,7 @@
         }
 
         let scene, camera, renderer, clock;
-        let mapGroup, entitiesGroup, sceneryGroup, environmentGroup;
+        let mapGroup, entitiesGroup, sceneryGroup, environmentGroup, remotePlayersGroup;
         let lavaSeaMesh, lavaSeaMat, customLavaModel, customLavaOffsetY = 0;
         let mapLoaded = false;
         let mapMeshes = [];
@@ -678,6 +726,230 @@
         };
 
         const camCtrl = { yaw: LEVEL_1_FACING_YAW, pitch: 0.22, distance: 8.2 };
+
+        function createNameTagSprite(labelText) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+            ctx.beginPath();
+            ctx.roundRect(12, 10, 232, 44, 18);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.fillStyle = '#fef08a';
+            ctx.font = 'bold 24px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(labelText || 'Jugador').slice(0, 18), 128, 33);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.encoding = THREE.sRGBEncoding;
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(2.4, 0.62, 1);
+            sprite.position.set(0, 3.85, 0);
+            return sprite;
+        }
+
+        function createRemotePlayerEntry(info) {
+            if (!remotePlayersGroup || !info || !info.id) return null;
+            removeRemotePlayer(info.id);
+
+            const root = new THREE.Group();
+            const built = createStylizedRobloxCharacterGroup(info.characterId || 'amy');
+            const cfg = CHARACTER_CATALOG[info.characterId] || CHARACTER_CATALOG.amy;
+            built.group.scale.setScalar(cfg.scale);
+            root.add(built.group);
+
+            const nameTag = createNameTagSprite(info.name || 'Jugador');
+            root.add(nameTag);
+
+            const startPos = new THREE.Vector3(
+                typeof info.x === 'number' ? info.x : LEVEL_1_FIXED_SPAWN.x,
+                typeof info.y === 'number' ? info.y : LEVEL_1_FIXED_SPAWN.y,
+                typeof info.z === 'number' ? info.z : LEVEL_1_FIXED_SPAWN.z
+            );
+            root.position.copy(startPos);
+            root.rotation.y = typeof info.yaw === 'number' ? info.yaw : 0;
+            remotePlayersGroup.add(root);
+
+            const entry = {
+                id: info.id,
+                name: info.name || 'Jugador',
+                characterId: info.characterId || 'amy',
+                root,
+                bodyGroup: built.group,
+                leftLeg: built.leftLeg,
+                rightLeg: built.rightLeg,
+                leftArm: built.leftArm,
+                rightArm: built.rightArm,
+                nameTag,
+                targetPos: startPos.clone(),
+                targetYaw: typeof info.yaw === 'number' ? info.yaw : 0,
+                speed: typeof info.speed === 'number' ? info.speed : 0,
+                onGround: info.onGround !== false,
+                walkCycle: 0
+            };
+
+            netState.remotePlayers.set(info.id, entry);
+            syncLobbyCharacterUI();
+            return entry;
+        }
+
+        function updateRemotePlayerAppearance(entry, newCharId, newName) {
+            if (!entry) return;
+            if (newName && newName !== entry.name) {
+                entry.name = newName;
+                if (entry.nameTag) entry.root.remove(entry.nameTag);
+                entry.nameTag = createNameTagSprite(newName);
+                entry.root.add(entry.nameTag);
+            }
+            if (newCharId && newCharId !== entry.characterId) {
+                entry.characterId = newCharId;
+                if (entry.bodyGroup) entry.root.remove(entry.bodyGroup);
+                const built = createStylizedRobloxCharacterGroup(newCharId);
+                const cfg = CHARACTER_CATALOG[newCharId] || CHARACTER_CATALOG.amy;
+                built.group.scale.setScalar(cfg.scale);
+                entry.bodyGroup = built.group;
+                entry.leftLeg = built.leftLeg;
+                entry.rightLeg = built.rightLeg;
+                entry.leftArm = built.leftArm;
+                entry.rightArm = built.rightArm;
+                entry.root.add(entry.bodyGroup);
+            }
+        }
+
+        function removeRemotePlayer(id) {
+            const entry = netState.remotePlayers.get(id);
+            if (!entry) return;
+            if (entry.root && remotePlayersGroup) {
+                remotePlayersGroup.remove(entry.root);
+            }
+            netState.remotePlayers.delete(id);
+            syncLobbyCharacterUI();
+        }
+
+        function clearRemotePlayers() {
+            for (const id of Array.from(netState.remotePlayers.keys())) {
+                removeRemotePlayer(id);
+            }
+        }
+
+        function sendPlayerStateNow() {
+            if (!netState.socket || !netState.connected || !player.pos) return;
+            netState.socket.emit('player_update', {
+                name: state.playerName,
+                characterId: state.selectedCharacter,
+                x: Number(player.pos.x.toFixed(2)),
+                y: Number(player.pos.y.toFixed(2)),
+                z: Number(player.pos.z.toFixed(2)),
+                yaw: Number(player.yaw.toFixed(3)),
+                speed: Number(Math.hypot(player.vel.x, player.vel.z).toFixed(2)),
+                onGround: Boolean(player.onGround),
+                level: state.currentLevel
+            });
+        }
+
+        function connectMultiplayerRoom() {
+            if (typeof io !== 'function') return;
+            if (netState.socket) {
+                netState.socket.disconnect();
+                netState.socket = null;
+            }
+            clearRemotePlayers();
+
+            const socket = io(MULTIPLAYER_SERVER_URL, {
+                transports: ['websocket', 'polling'],
+                reconnection: true
+            });
+            netState.socket = socket;
+
+            socket.on('connect', () => {
+                netState.connected = true;
+                socket.emit('join_room', {
+                    room: state.roomCode,
+                    name: state.playerName,
+                    characterId: state.selectedCharacter,
+                    x: player.pos.x,
+                    y: player.pos.y,
+                    z: player.pos.z,
+                    yaw: player.yaw,
+                    level: state.currentLevel
+                });
+                syncLobbyCharacterUI();
+                showToast(`Conectado a la sala "${state.roomCode}"`, 1500);
+            });
+
+            socket.on('disconnect', () => {
+                netState.connected = false;
+                syncLobbyCharacterUI();
+            });
+
+            socket.on('room_state', (data = {}) => {
+                const list = Array.isArray(data.players) ? data.players : [];
+                for (const p of list) {
+                    if (p.id !== socket.id) createRemotePlayerEntry(p);
+                }
+                syncLobbyCharacterUI();
+            });
+
+            socket.on('player_joined', (p) => {
+                if (!p || p.id === socket.id) return;
+                createRemotePlayerEntry(p);
+                showToast(`${p.name || 'Jugador'} se unió a la sala`, 1500);
+            });
+
+            socket.on('player_moved', (p) => {
+                if (!p || p.id === socket.id) return;
+                let entry = netState.remotePlayers.get(p.id);
+                if (!entry) {
+                    entry = createRemotePlayerEntry(p);
+                }
+                if (!entry) return;
+                updateRemotePlayerAppearance(entry, p.characterId, p.name);
+                if (typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
+                    entry.targetPos.set(p.x, p.y, p.z);
+                }
+                if (typeof p.yaw === 'number') {
+                    entry.targetYaw = p.yaw;
+                }
+                if (typeof p.speed === 'number') entry.speed = p.speed;
+                if (typeof p.onGround === 'boolean') entry.onGround = p.onGround;
+            });
+
+            socket.on('player_left', (data = {}) => {
+                if (data.id) removeRemotePlayer(data.id);
+            });
+        }
+
+        function updateRemotePlayers(dt) {
+            for (const entry of netState.remotePlayers.values()) {
+                entry.root.position.lerp(entry.targetPos, Math.min(1, dt * 14));
+                entry.root.rotation.y = entry.targetYaw;
+
+                const moving = entry.speed > 0.35;
+                if (moving) {
+                    entry.walkCycle += dt * 11;
+                }
+                const swing = moving ? Math.sin(entry.walkCycle) * 0.65 : 0;
+                if (entry.leftLeg && entry.rightLeg && entry.leftArm && entry.rightArm) {
+                    if (!entry.onGround) {
+                        entry.leftLeg.rotation.x = 0.4;
+                        entry.rightLeg.rotation.x = -0.3;
+                        entry.leftArm.rotation.x = -0.6;
+                        entry.rightArm.rotation.x = -0.6;
+                    } else {
+                        entry.leftLeg.rotation.x = swing;
+                        entry.rightLeg.rotation.x = -swing;
+                        entry.leftArm.rotation.x = -swing * 0.7;
+                        entry.rightArm.rotation.x = swing * 0.7;
+                    }
+                }
+            }
+        }
 
         function restoreOccludedMaterials() {
             for (const mat of occludedMaterials) {
@@ -2121,7 +2393,8 @@
             sceneryGroup = new THREE.Group();
             mapGroup = new THREE.Group();
             entitiesGroup = new THREE.Group();
-            scene.add(environmentGroup, sceneryGroup, mapGroup, entitiesGroup);
+            remotePlayersGroup = new THREE.Group();
+            scene.add(environmentGroup, sceneryGroup, mapGroup, entitiesGroup, remotePlayersGroup);
 
             buildLavaSea();
             buildDistantDuskClouds();
@@ -2150,6 +2423,7 @@
             } else {
                 snapCameraToPlayer();
             }
+            sendPlayerStateNow();
             if (byHazard) showToast('¡Caíste en la lava! Regresaste al punto seguro', 1400);
         }
 
@@ -2198,6 +2472,7 @@
                 player.jumpsUsed += 1;
                 setPlayerAnimation('jump', true);
                 sfxJump();
+                sendPlayerStateNow();
             }
         }
 
@@ -2209,8 +2484,37 @@
             return null;
         }
 
+        function syncInputsFromState() {
+            const nameInput = document.getElementById('input-player-name');
+            const roomInput = document.getElementById('input-room-code');
+            if (nameInput) nameInput.value = state.playerName;
+            if (roomInput) roomInput.value = state.roomCode;
+        }
+
         function bindControls() {
+            syncInputsFromState();
+
+            document.getElementById('input-player-name')?.addEventListener('change', (e) => {
+                const val = String(e.target.value || '').trim().slice(0, 20);
+                state.playerName = val || 'Jugador';
+                e.target.value = state.playerName;
+                saveState();
+                sendPlayerStateNow();
+            });
+
+            document.getElementById('input-room-code')?.addEventListener('change', (e) => {
+                const val = String(e.target.value || '').trim().slice(0, 30);
+                const nextRoom = val || 'familia-obby';
+                e.target.value = nextRoom;
+                if (nextRoom !== state.roomCode) {
+                    state.roomCode = nextRoom;
+                    saveState();
+                    connectMultiplayerRoom();
+                }
+            });
+
             window.addEventListener('keydown', (e) => {
+                if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
                 input.keys[e.code] = true;
                 if (e.code === 'Space') {
                     e.preventDefault();
@@ -2238,6 +2542,7 @@
                 applySelectedCharacterAppearance();
                 updateHud();
                 closeCharacterModal();
+                sendPlayerStateNow();
                 showToast(`Personaje seleccionado: ${CHARACTER_CATALOG[chosen].name}`, 1400);
             });
 
@@ -2373,12 +2678,28 @@
             window.addEventListener('mouseup', () => { mouseDragging = false; });
 
             document.getElementById('btn-play')?.addEventListener('click', () => {
+                const nameInput = document.getElementById('input-player-name');
+                const roomInput = document.getElementById('input-room-code');
+                const nextName = String(nameInput?.value || state.playerName).trim().slice(0, 20) || 'Jugador';
+                const nextRoom = String(roomInput?.value || state.roomCode).trim().slice(0, 30) || 'familia-obby';
+                const roomChanged = nextRoom !== state.roomCode;
+                state.playerName = nextName;
+                state.roomCode = nextRoom;
+                saveState();
+
                 ensureAudioContext();
                 requestImmersiveFullscreen();
                 applySelectedCharacterAppearance();
                 teleportToStageProgress(state.currentLevel || 1);
                 setMode('playing');
+
+                if (!netState.socket || roomChanged) {
+                    connectMultiplayerRoom();
+                } else {
+                    sendPlayerStateNow();
+                }
             });
+
             document.getElementById('btn-hud-fullscreen')?.addEventListener('click', () => {
                 requestImmersiveFullscreen();
             });
@@ -2407,6 +2728,7 @@
                 saveState();
                 teleportToStageProgress(clamped);
                 updateHud();
+                sendPlayerStateNow();
                 showToast(`Etapa ${clamped}`, 1100);
             };
             document.getElementById('btn-stage-first')?.addEventListener('click', () => jumpToStage(1));
@@ -2694,6 +3016,7 @@
 
                     sfxCheckpoint();
                     setSingleActiveCheckpoint(cp.stageNum + 1);
+                    sendPlayerStateNow();
                     showToast(`¡Nivel ${cp.stageNum} desbloqueado! Sigue la flecha`, 1600);
                 }
             }
@@ -2705,6 +3028,7 @@
                 saveState();
                 updateHud();
                 sfxWin();
+                sendPlayerStateNow();
                 openVictoryModal();
             }
 
@@ -2722,6 +3046,12 @@
 
             updateProceduralMovementAnimation(dt, Math.hypot(player.vel.x, player.vel.z));
             player.root.position.copy(player.pos);
+
+            netState.sendTimer += dt;
+            if (netState.sendTimer >= NETWORK_SEND_INTERVAL) {
+                netState.sendTimer = 0;
+                sendPlayerStateNow();
+            }
         }
 
         function updateCamera() {
@@ -2738,6 +3068,7 @@
             updateLavaSplashes(dt);
             updateWorld(dt, elapsed);
             updatePlayer(dt, elapsed);
+            updateRemotePlayers(dt);
             updateCamera();
             renderer.render(scene, camera);
             renderCharacterPreviewFrame(dt);
@@ -2749,6 +3080,7 @@
             initThree();
             bindControls();
             updateHud();
+            connectMultiplayerRoom();
             animate();
         });
     </script>
