@@ -94,7 +94,7 @@
                 Colorful 100-Stage Obby
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Muévete, salta, activa checkpoints y alcanza la meta final evitando la lava.
+                Avanza checkpoint por checkpoint hasta la meta del nivel 100 evitando la lava.
             </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
@@ -179,17 +179,17 @@
         </div>
     </div>
 
-    <!-- Modal de Victoria (Meta Final) -->
+    <!-- Modal de Victoria (Meta Final del Nivel 100) -->
     <div id="victory-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
         <div class="w-full max-w-md bg-slate-900 border-2 border-amber-400/50 rounded-3xl p-6 text-white shadow-2xl text-center">
             <div class="inline-block bg-amber-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
-                🏆 META COMPLETADA
+                🏆 NIVEL 100 COMPLETADO
             </div>
             <h2 class="roblox-title text-3xl font-bold text-amber-300 mb-2">
-                ¡Ganaste el Obby!
+                ¡Llegaste al Final!
             </h2>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Llegaste hasta la meta final y superaste las 100 etapas con Amy.
+                Superaste el recorrido hasta el nivel 100 con Amy. Puedes seguir explorando o reiniciar desde el nivel 1.
             </p>
             <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3 mb-5">
                 <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas Totales</div>
@@ -200,7 +200,7 @@
                     ▶ Seguir Explorando
                 </button>
                 <button id="btn-victory-restart" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
-                    ↺ Reiniciar desde Etapa 1
+                    ↺ Reiniciar desde Nivel 1
                 </button>
             </div>
         </div>
@@ -208,7 +208,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v22';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v23';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
@@ -501,6 +501,8 @@
         let currentSpawn = new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z);
         let goalBeacon = null;
         let goalPos = null;
+        let activeCheckpoint = null;
+        let guideArrow = null;
 
         const raycaster = new THREE.Raycaster();
         const downDir = new THREE.Vector3(0, -1, 0);
@@ -1068,8 +1070,10 @@
             while (entitiesGroup.children.length > 0) entitiesGroup.remove(entitiesGroup.children[0]);
             coins.length = 0;
             checkpoints.length = 0;
+            activeCheckpoint = null;
             goalBeacon = null;
             goalPos = null;
+            guideArrow = null;
         }
 
         function addCoin(x, y, z) {
@@ -1083,9 +1087,25 @@
             coins.push({ mesh, x, y, z, collected: false });
         }
 
-        function addCheckpoint(x, y, z, stageNum) {
+        function buildGuideArrow() {
+            const arrowGroup = new THREE.Group();
+            const coneMat = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                emissive: 0x0284c7,
+                emissiveIntensity: 0.75
+            });
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.72, 12), coneMat);
+            cone.rotation.x = Math.PI / 2;
+            cone.position.z = 0.25;
+            arrowGroup.add(cone);
+            entitiesGroup.add(arrowGroup);
+            guideArrow = { group: arrowGroup, coneMat };
+        }
+
+        function addCheckpoint(x, y, z, stageNum, visibleInitially = false) {
             const group = new THREE.Group();
             group.position.set(x, y, z);
+            group.visible = visibleInitially;
 
             const padMat = new THREE.MeshStandardMaterial({
                 color: 0x22c55e,
@@ -1117,7 +1137,8 @@
             group.add(pillar);
 
             entitiesGroup.add(group);
-            checkpoints.push({
+            const cp = {
+                group,
                 x,
                 y: y + 0.25,
                 z,
@@ -1127,12 +1148,33 @@
                 ringMat,
                 pillarMat,
                 ring
-            });
+            };
+            checkpoints.push(cp);
+            return cp;
+        }
+
+        function revealCheckpointForStage(targetStageNum, announce = false) {
+            for (const cp of checkpoints) {
+                if (cp.stageNum <= targetStageNum) {
+                    cp.group.visible = true;
+                }
+            }
+            const nextPending = checkpoints.find(cp => !cp.activated && cp.stageNum >= targetStageNum);
+            activeCheckpoint = nextPending || null;
+            if (activeCheckpoint) {
+                activeCheckpoint.group.visible = true;
+                if (announce) {
+                    showToast(`Checkpoint del Nivel ${activeCheckpoint.stageNum} disponible`, 1600);
+                }
+            } else if (goalBeacon) {
+                goalBeacon.group.visible = true;
+            }
         }
 
         function addFinalGoal(x, y, z) {
             const group = new THREE.Group();
             group.position.set(x, y, z);
+            group.visible = false;
 
             const base = new THREE.Mesh(
                 new THREE.CylinderGeometry(3.2, 3.6, 0.35, 24),
@@ -1175,9 +1217,36 @@
             goalPos = new THREE.Vector3(x, y + 0.5, z);
         }
 
+        function findNearestValidFloor(x, z, startY, searchTopY) {
+            const offsets = [
+                [0, 0],
+                [-3.5, -2.5], [3.5, -2.5], [-3.5, 2.5], [3.5, 2.5],
+                [-7.0, 0], [7.0, 0], [0, -7.0], [0, 7.0]
+            ];
+            let best = null;
+            let bestScore = Infinity;
+            for (const [ox, oz] of offsets) {
+                const sx = x + ox;
+                const sz = z + oz;
+                const sy = findSurfaceHeightAt(sx, sz, searchTopY, false);
+                if (typeof sy === 'number' && sy > lavaFloorY + 1.0) {
+                    const dist2D = Math.hypot(sx - x, sz - z);
+                    const deltaY = Math.abs(sy - startY) * 1.4;
+                    const score = dist2D + deltaY;
+                    if (score < bestScore) {
+                        bestScore = score;
+                        best = { x: sx, y: sy, z: sz };
+                    }
+                }
+            }
+            return best;
+        }
+
         function populateMapEntities() {
             clearEntities();
             if (!mapBox) return;
+            buildGuideArrow();
+
             const spanX = mapBox.max.x - mapBox.min.x;
             const searchTopY = mapBox.max.y + 40;
             const savedSpawn = loadSavedSpawn();
@@ -1197,27 +1266,37 @@
             if (player.root) player.root.position.copy(player.pos);
             applyFacingAngle(LEVEL_1_FACING_YAW);
 
-            let nextStageNumber = 2;
-            for (let step = 1; step <= 21; step++) {
-                const frac = step / 22;
-                const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.24), frac);
-                const pz = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.72, frac);
-                const surfY = findSurfaceHeightAt(px, pz, searchTopY, false);
-                if (typeof surfY === 'number') {
-                    addCoin(px, surfY + 1.2, pz);
-                    if (step % 3 === 0 && nextStageNumber <= TOTAL_LEVELS) {
-                        addCheckpoint(px, surfY, pz, nextStageNumber);
-                        nextStageNumber += 1;
-                    }
+            const totalCheckpoints = 98;
+            let cursorX = bestStart.x;
+            let cursorY = bestStart.y;
+            let cursorZ = bestStart.z;
+
+            for (let idx = 1; idx <= totalCheckpoints; idx++) {
+                const stageNum = idx + 1;
+                const frac = idx / (totalCheckpoints + 1);
+                const waveX = Math.sin(idx * 0.78) * (spanX * 0.22);
+                const idealX = THREE.MathUtils.lerp(bestStart.x, waveX, Math.min(1, frac * 1.35));
+                const idealZ = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.76, frac);
+
+                const spot = findNearestValidFloor(idealX, idealZ, cursorY, searchTopY);
+                if (spot) {
+                    cursorX = spot.x;
+                    cursorY = spot.y;
+                    cursorZ = spot.z;
+                    const isFirst = stageNum === 2;
+                    addCheckpoint(cursorX, cursorY, cursorZ, stageNum, isFirst);
+                    addCoin(cursorX + 1.8, cursorY + 1.2, cursorZ);
                 }
             }
 
-            const endX = Math.sin(22 * 1.1) * (spanX * 0.22);
-            const endZ = mapBox.min.z * 0.74;
-            const endSurfY = findSurfaceHeightAt(endX, endZ, searchTopY, false);
-            if (typeof endSurfY === 'number') {
-                addFinalGoal(endX, endSurfY, endZ);
+            const endSpot = findNearestValidFloor(cursorX, cursorZ - 6, cursorY, searchTopY);
+            if (endSpot) {
+                addFinalGoal(endSpot.x, endSpot.y, endSpot.z);
+            } else {
+                addFinalGoal(cursorX, cursorY, cursorZ - 5);
             }
+
+            revealCheckpointForStage(state.currentLevel + 1, false);
         }
 
         function teleportToStageProgress(stageNum) {
@@ -1228,16 +1307,19 @@
                 player.vel.set(0, 0, 0);
                 player.jumpsUsed = 0;
                 if (player.root) player.root.position.copy(player.pos);
+                revealCheckpointForStage(2, false);
                 applyFacingAngle(LEVEL_1_FACING_YAW);
                 return;
             }
             const matchingCp = checkpoints.find(cp => cp.stageNum === stageNum);
             if (matchingCp) {
+                matchingCp.group.visible = true;
                 currentSpawn.set(matchingCp.x, matchingCp.y + 0.25, matchingCp.z);
                 player.pos.copy(currentSpawn);
                 player.vel.set(0, 0, 0);
                 player.jumpsUsed = 0;
                 if (player.root) player.root.position.copy(player.pos);
+                revealCheckpointForStage(stageNum + 1, false);
                 snapCameraToPlayer();
                 return;
             }
@@ -1252,6 +1334,7 @@
             player.vel.set(0, 0, 0);
             player.jumpsUsed = 0;
             if (player.root) player.root.position.copy(player.pos);
+            revealCheckpointForStage(stageNum + 1, false);
             snapCameraToPlayer();
         }
 
@@ -1850,7 +1933,7 @@
                 saveState();
                 teleportToStageProgress(1);
                 updateHud();
-                showToast('¡Nueva partida desde Etapa 1!', 1500);
+                showToast('¡Nueva partida desde Nivel 1!', 1500);
             });
 
             const jumpToStage = (targetLvl) => {
@@ -1950,6 +2033,26 @@
             }
         }
 
+        function updateGuideArrow(elapsed) {
+            if (!guideArrow || !player.pos) return;
+            const targetPoint = activeCheckpoint
+                ? new THREE.Vector3(activeCheckpoint.x, activeCheckpoint.y + 1.4, activeCheckpoint.z)
+                : goalPos;
+
+            if (!targetPoint || state.mode !== 'playing') {
+                guideArrow.group.visible = false;
+                return;
+            }
+
+            guideArrow.group.visible = true;
+            const orbitAngle = elapsed * 2.2;
+            const ox = player.pos.x + Math.cos(orbitAngle) * 1.35;
+            const oz = player.pos.z + Math.sin(orbitAngle) * 1.35;
+            const oy = player.pos.y + 2.85 + Math.sin(elapsed * 4.0) * 0.14;
+            guideArrow.group.position.set(ox, oy, oz);
+            guideArrow.group.lookAt(targetPoint);
+        }
+
         function updateWorld(dt, elapsed) {
             for (const cl of skyClouds) {
                 cl.angle += cl.speed * dt;
@@ -1994,16 +2097,19 @@
             }
 
             for (const cp of checkpoints) {
+                if (!cp.group.visible) continue;
                 if (cp.ring) {
                     cp.ring.rotation.y += 2.2 * dt;
                     cp.ring.position.y = 1.65 + Math.sin(elapsed * 3 + cp.stageNum) * 0.16;
                 }
             }
 
-            if (goalBeacon && goalBeacon.crown) {
+            if (goalBeacon && goalBeacon.group.visible && goalBeacon.crown) {
                 goalBeacon.crown.rotation.y += 2.6 * dt;
                 goalBeacon.crown.position.y = 2.6 + Math.sin(elapsed * 3.2) * 0.25;
             }
+
+            updateGuideArrow(elapsed);
 
             for (const c of coins) {
                 if (c.collected) continue;
@@ -2106,8 +2212,8 @@
             }
 
             for (const cp of checkpoints) {
-                if (cp.activated) continue;
-                if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 3.1) {
+                if (cp.activated || !cp.group.visible) continue;
+                if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 3.2) {
                     cp.activated = true;
                     currentSpawn.set(cp.x, cp.y + 0.25, cp.z);
                     cp.padMat.color.setHex(0xfacc15);
@@ -2115,18 +2221,21 @@
                     cp.ringMat.color.setHex(0xfef08a);
                     cp.ringMat.emissive.setHex(0xf59e0b);
                     cp.pillarMat.color.setHex(0xfacc15);
+
                     if (cp.stageNum > state.currentLevel) {
                         state.currentLevel = cp.stageNum;
                         if (cp.stageNum > state.maxUnlockedLevel) state.maxUnlockedLevel = cp.stageNum;
                         saveState();
                         updateHud();
                     }
+
                     sfxCheckpoint();
-                    showToast(`¡Checkpoint! Etapa ${cp.stageNum} desbloqueada`, 1600);
+                    revealCheckpointForStage(cp.stageNum + 1, false);
+                    showToast(`¡Checkpoint Nivel ${cp.stageNum}! Sigue la flecha`, 1600);
                 }
             }
 
-            if (goalPos && !state.wonGame && player.pos.distanceTo(goalPos) < 3.4) {
+            if (goalPos && goalBeacon && goalBeacon.group.visible && !state.wonGame && player.pos.distanceTo(goalPos) < 3.5) {
                 state.wonGame = true;
                 state.currentLevel = TOTAL_LEVELS;
                 state.maxUnlockedLevel = TOTAL_LEVELS;
