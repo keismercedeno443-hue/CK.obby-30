@@ -94,7 +94,7 @@
                 Colorful 100-Stage Obby
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-5">
-                Muévete, salta y evita caer en el piso de lava.
+                Muévete, salta, activa checkpoints y alcanza la meta final evitando la lava.
             </p>
 
             <div class="grid grid-cols-2 gap-3 mb-5">
@@ -179,9 +179,36 @@
         </div>
     </div>
 
+    <!-- Modal de Victoria (Meta Final) -->
+    <div id="victory-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div class="w-full max-w-md bg-slate-900 border-2 border-amber-400/50 rounded-3xl p-6 text-white shadow-2xl text-center">
+            <div class="inline-block bg-amber-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
+                🏆 META COMPLETADA
+            </div>
+            <h2 class="roblox-title text-3xl font-bold text-amber-300 mb-2">
+                ¡Ganaste el Obby!
+            </h2>
+            <p class="text-slate-300 text-xs sm:text-sm mb-5">
+                Llegaste hasta la meta final y superaste las 100 etapas con Amy.
+            </p>
+            <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3 mb-5">
+                <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas Totales</div>
+                <div id="victory-coins" class="text-2xl font-black text-amber-300 mt-0.5">0</div>
+            </div>
+            <div class="flex flex-col gap-2.5">
+                <button id="btn-victory-continue" class="roblox-btn w-full py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-sm">
+                    ▶ Seguir Explorando
+                </button>
+                <button id="btn-victory-restart" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
+                    ↺ Reiniciar desde Etapa 1
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v21';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v22';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
@@ -217,7 +244,8 @@
             currentLevel: 1,
             maxUnlockedLevel: 1,
             coins: 0,
-            soundEnabled: true
+            soundEnabled: true,
+            wonGame: false
         };
 
         function requestImmersiveFullscreen() {
@@ -240,6 +268,7 @@
                 if (typeof parsed.maxUnlockedLevel === 'number') state.maxUnlockedLevel = Math.max(1, Math.min(TOTAL_LEVELS, parsed.maxUnlockedLevel));
                 if (typeof parsed.coins === 'number') state.coins = Math.max(0, Math.floor(parsed.coins));
                 if (typeof parsed.soundEnabled === 'boolean') state.soundEnabled = parsed.soundEnabled;
+                if (typeof parsed.wonGame === 'boolean') state.wonGame = parsed.wonGame;
             } catch (err) {
                 console.warn('Error cargando progreso:', err);
             }
@@ -251,7 +280,8 @@
                     currentLevel: state.currentLevel,
                     maxUnlockedLevel: state.maxUnlockedLevel,
                     coins: state.coins,
-                    soundEnabled: state.soundEnabled
+                    soundEnabled: state.soundEnabled,
+                    wonGame: state.wonGame
                 }));
             } catch (err) {
                 console.warn('Error guardando progreso:', err);
@@ -333,6 +363,11 @@
             playTone(523.25, 0.09, 'triangle', 0.09, 659.25);
             setTimeout(() => playTone(783.99, 0.14, 'triangle', 0.09, 1046.5), 75);
         }
+        function sfxWin() {
+            playTone(523.25, 0.12, 'triangle', 0.1, 659.25);
+            setTimeout(() => playTone(659.25, 0.12, 'triangle', 0.1, 783.99), 110);
+            setTimeout(() => playTone(783.99, 0.24, 'triangle', 0.11, 1046.5), 220);
+        }
         function sfxFail() { playTone(220, 0.25, 'sawtooth', 0.08, 95); }
 
         function startSuspenseMusic() {
@@ -368,8 +403,25 @@
             document.getElementById('hud-coins-text').textContent = String(state.coins);
             document.getElementById('lobby-max-level').textContent = `${state.maxUnlockedLevel} / ${TOTAL_LEVELS}`;
             document.getElementById('lobby-coins').textContent = String(state.coins);
+            const vc = document.getElementById('victory-coins');
+            if (vc) vc.textContent = String(state.coins);
             const soundBtn = document.getElementById('btn-hud-sound');
             if (soundBtn) soundBtn.textContent = state.soundEnabled ? '🔊' : '🔇';
+        }
+
+        function openVictoryModal() {
+            updateHud();
+            const modal = document.getElementById('victory-modal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeVictoryModal() {
+            const modal = document.getElementById('victory-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
 
         function setMode(newMode) {
@@ -442,10 +494,13 @@
         let lavaSeaMesh, lavaSeaMat, customLavaModel, customLavaOffsetY = 0;
         let mapLoaded = false;
         let mapMeshes = [];
+        let occludedMaterials = new Set();
         let mapBox = null;
         let lavaFloorY = -5.5;
         let level1Spawn = new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z);
         let currentSpawn = new THREE.Vector3(LEVEL_1_FIXED_SPAWN.x, LEVEL_1_FIXED_SPAWN.y, LEVEL_1_FIXED_SPAWN.z);
+        let goalBeacon = null;
+        let goalPos = null;
 
         const raycaster = new THREE.Raycaster();
         const downDir = new THREE.Vector3(0, -1, 0);
@@ -484,6 +539,42 @@
 
         const camCtrl = { yaw: LEVEL_1_FACING_YAW, pitch: 0.22, distance: 8.2 };
 
+        function restoreOccludedMaterials() {
+            for (const mat of occludedMaterials) {
+                if (!mat || !mat.userData) continue;
+                mat.opacity = mat.userData.origOpacity !== undefined ? mat.userData.origOpacity : 1.0;
+                mat.transparent = mat.userData.origTransparent !== undefined ? mat.userData.origTransparent : false;
+                mat.needsUpdate = true;
+            }
+            occludedMaterials.clear();
+        }
+
+        function updateCameraOcclusionTransparency(target, desiredPos) {
+            restoreOccludedMaterials();
+            if (!mapLoaded || mapMeshes.length === 0) return;
+            const toCam = desiredPos.clone().sub(target);
+            const dist = toCam.length();
+            if (dist <= 0.6) return;
+            toCam.normalize();
+            const occRay = new THREE.Raycaster(target, toCam, 0.25, Math.max(0.5, dist - 0.35));
+            const hits = occRay.intersectObjects(mapMeshes, true);
+            for (const h of hits) {
+                if (!h.object || !h.object.material) continue;
+                const mats = Array.isArray(h.object.material) ? h.object.material : [h.object.material];
+                mats.forEach((m) => {
+                    if (!m.userData || m.userData.origOpacity === undefined) {
+                        m.userData = m.userData || {};
+                        m.userData.origOpacity = m.opacity !== undefined ? m.opacity : 1.0;
+                        m.userData.origTransparent = Boolean(m.transparent);
+                    }
+                    m.transparent = true;
+                    m.opacity = 0.24;
+                    m.needsUpdate = true;
+                    occludedMaterials.add(m);
+                });
+            }
+        }
+
         function computeCameraDesiredPos(target) {
             const horizDist = Math.cos(camCtrl.pitch) * camCtrl.distance;
             const vertDist = Math.sin(camCtrl.pitch) * camCtrl.distance;
@@ -492,19 +583,20 @@
                 target.y + vertDist,
                 target.z + Math.cos(camCtrl.yaw) * horizDist
             );
-            if (mapLoaded && mapMeshes.length > 0 && camCtrl.pitch >= 0) {
+            if (mapLoaded && mapMeshes.length > 0) {
                 const dir = desiredPos.clone().sub(target);
                 const maxDist = dir.length();
                 if (maxDist > 0.5) {
                     dir.normalize();
-                    const camRay = new THREE.Raycaster(target, dir, 0.3, maxDist);
+                    const camRay = new THREE.Raycaster(target, dir, 0.25, maxDist);
                     const hits = camRay.intersectObjects(mapMeshes, true);
                     if (hits.length > 0) {
-                        const safeDist = Math.max(MIN_CAM_DIST, Math.min(camCtrl.distance, hits[0].distance - 0.85));
+                        const safeDist = Math.max(2.2, Math.min(camCtrl.distance, hits[0].distance - 0.75));
                         desiredPos.copy(target).addScaledVector(dir, safeDist);
                     }
                 }
             }
+            updateCameraOcclusionTransparency(target, desiredPos);
             return desiredPos;
         }
 
@@ -711,14 +803,16 @@
                                     mats.forEach((m) => {
                                         m.visible = true;
                                         m.side = THREE.DoubleSide;
+                                        m.color = new THREE.Color(0x09090b);
                                         if (m.map) {
                                             m.map.encoding = THREE.sRGBEncoding;
                                             m.needsUpdate = true;
                                         }
-                                        if (m.emissive) {
-                                            m.emissive.setHex(0xea580c);
-                                            m.emissiveIntensity = 0.25;
-                                        }
+                                        m.emissive = new THREE.Color(0xff4500);
+                                        if (m.map) m.emissiveMap = m.map;
+                                        m.emissiveIntensity = 0.85;
+                                        m.roughness = 0.35;
+                                        m.metalness = 0.25;
                                         m.needsUpdate = true;
                                     });
                                 }
@@ -974,6 +1068,8 @@
             while (entitiesGroup.children.length > 0) entitiesGroup.remove(entitiesGroup.children[0]);
             coins.length = 0;
             checkpoints.length = 0;
+            goalBeacon = null;
+            goalPos = null;
         }
 
         function addCoin(x, y, z) {
@@ -988,13 +1084,95 @@
         }
 
         function addCheckpoint(x, y, z, stageNum) {
-            const pad = new THREE.Mesh(
-                new THREE.BoxGeometry(2.8, 0.22, 2.8),
-                new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x15803d, emissiveIntensity: 0.4 })
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+
+            const padMat = new THREE.MeshStandardMaterial({
+                color: 0x22c55e,
+                emissive: 0x15803d,
+                emissiveIntensity: 0.55
+            });
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.26, 3.4), padMat);
+            pad.position.y = 0.13;
+            group.add(pad);
+
+            const ringMat = new THREE.MeshStandardMaterial({
+                color: 0x4ade80,
+                emissive: 0x22c55e,
+                emissiveIntensity: 0.65,
+                transparent: true,
+                opacity: 0.85
+            });
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.12, 12, 24), ringMat);
+            ring.position.y = 1.65;
+            group.add(ring);
+
+            const pillarMat = new THREE.MeshBasicMaterial({
+                color: 0x4ade80,
+                transparent: true,
+                opacity: 0.22
+            });
+            const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 7.5, 14, 1, true), pillarMat);
+            pillar.position.y = 3.8;
+            group.add(pillar);
+
+            entitiesGroup.add(group);
+            checkpoints.push({
+                x,
+                y: y + 0.25,
+                z,
+                stageNum,
+                activated: false,
+                padMat,
+                ringMat,
+                pillarMat,
+                ring
+            });
+        }
+
+        function addFinalGoal(x, y, z) {
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+
+            const base = new THREE.Mesh(
+                new THREE.CylinderGeometry(3.2, 3.6, 0.35, 24),
+                new THREE.MeshStandardMaterial({
+                    color: 0xfbbf24,
+                    emissive: 0xd97706,
+                    emissiveIntensity: 0.6,
+                    metalness: 0.5,
+                    roughness: 0.25
+                })
             );
-            pad.position.set(x, y + 0.11, z);
-            entitiesGroup.add(pad);
-            checkpoints.push({ x, y: y + 0.25, z, stageNum, activated: false, pad });
+            base.position.y = 0.18;
+            group.add(base);
+
+            const crown = new THREE.Mesh(
+                new THREE.OctahedronGeometry(1.15, 0),
+                new THREE.MeshStandardMaterial({
+                    color: 0xfef08a,
+                    emissive: 0xf59e0b,
+                    emissiveIntensity: 0.85
+                })
+            );
+            crown.position.y = 2.6;
+            group.add(crown);
+
+            const beam = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.1, 1.1, 16, 18, 1, true),
+                new THREE.MeshBasicMaterial({
+                    color: 0xfacc15,
+                    transparent: true,
+                    opacity: 0.24,
+                    side: THREE.DoubleSide
+                })
+            );
+            beam.position.y = 8.2;
+            group.add(beam);
+
+            entitiesGroup.add(group);
+            goalBeacon = { group, crown };
+            goalPos = new THREE.Vector3(x, y + 0.5, z);
         }
 
         function populateMapEntities() {
@@ -1020,8 +1198,8 @@
             applyFacingAngle(LEVEL_1_FACING_YAW);
 
             let nextStageNumber = 2;
-            for (let step = 1; step <= 20; step++) {
-                const frac = step / 21;
+            for (let step = 1; step <= 21; step++) {
+                const frac = step / 22;
                 const px = THREE.MathUtils.lerp(bestStart.x, Math.sin(step * 1.1) * (spanX * 0.24), frac);
                 const pz = THREE.MathUtils.lerp(bestStart.z, mapBox.min.z * 0.72, frac);
                 const surfY = findSurfaceHeightAt(px, pz, searchTopY, false);
@@ -1032,6 +1210,13 @@
                         nextStageNumber += 1;
                     }
                 }
+            }
+
+            const endX = Math.sin(22 * 1.1) * (spanX * 0.22);
+            const endZ = mapBox.min.z * 0.74;
+            const endSurfY = findSurfaceHeightAt(endX, endZ, searchTopY, false);
+            if (typeof endSurfY === 'number') {
+                addFinalGoal(endX, endSurfY, endZ);
             }
         }
 
@@ -1044,6 +1229,16 @@
                 player.jumpsUsed = 0;
                 if (player.root) player.root.position.copy(player.pos);
                 applyFacingAngle(LEVEL_1_FACING_YAW);
+                return;
+            }
+            const matchingCp = checkpoints.find(cp => cp.stageNum === stageNum);
+            if (matchingCp) {
+                currentSpawn.set(matchingCp.x, matchingCp.y + 0.25, matchingCp.z);
+                player.pos.copy(currentSpawn);
+                player.vel.set(0, 0, 0);
+                player.jumpsUsed = 0;
+                if (player.root) player.root.position.copy(player.pos);
+                snapCameraToPlayer();
                 return;
             }
             const frac = Math.max(0, Math.min(1, (stageNum - 1) / (TOTAL_LEVELS - 1)));
@@ -1634,9 +1829,7 @@
             document.getElementById('btn-play')?.addEventListener('click', () => {
                 ensureAudioContext();
                 requestImmersiveFullscreen();
-                state.currentLevel = 1;
-                saveState();
-                teleportToStageProgress(1);
+                teleportToStageProgress(state.currentLevel || 1);
                 setMode('playing');
             });
             document.getElementById('btn-hud-fullscreen')?.addEventListener('click', () => {
@@ -1646,6 +1839,19 @@
             document.getElementById('btn-close-levels')?.addEventListener('click', closeLevelsModal);
             document.getElementById('btn-hud-lobby')?.addEventListener('click', () => setMode('lobby'));
             document.getElementById('btn-hud-levels')?.addEventListener('click', openLevelsModal);
+
+            document.getElementById('btn-victory-continue')?.addEventListener('click', () => {
+                closeVictoryModal();
+            });
+            document.getElementById('btn-victory-restart')?.addEventListener('click', () => {
+                closeVictoryModal();
+                state.currentLevel = 1;
+                state.wonGame = false;
+                saveState();
+                teleportToStageProgress(1);
+                updateHud();
+                showToast('¡Nueva partida desde Etapa 1!', 1500);
+            });
 
             const jumpToStage = (targetLvl) => {
                 const clamped = Math.max(1, Math.min(state.maxUnlockedLevel, targetLvl));
@@ -1787,6 +1993,18 @@
                 }
             }
 
+            for (const cp of checkpoints) {
+                if (cp.ring) {
+                    cp.ring.rotation.y += 2.2 * dt;
+                    cp.ring.position.y = 1.65 + Math.sin(elapsed * 3 + cp.stageNum) * 0.16;
+                }
+            }
+
+            if (goalBeacon && goalBeacon.crown) {
+                goalBeacon.crown.rotation.y += 2.6 * dt;
+                goalBeacon.crown.position.y = 2.6 + Math.sin(elapsed * 3.2) * 0.25;
+            }
+
             for (const c of coins) {
                 if (c.collected) continue;
                 c.mesh.rotation.z += 2.6 * dt;
@@ -1889,10 +2107,14 @@
 
             for (const cp of checkpoints) {
                 if (cp.activated) continue;
-                if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 2.8) {
+                if (player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 3.1) {
                     cp.activated = true;
                     currentSpawn.set(cp.x, cp.y + 0.25, cp.z);
-                    cp.pad.material.color.setHex(0xfacc15);
+                    cp.padMat.color.setHex(0xfacc15);
+                    cp.padMat.emissive.setHex(0xd97706);
+                    cp.ringMat.color.setHex(0xfef08a);
+                    cp.ringMat.emissive.setHex(0xf59e0b);
+                    cp.pillarMat.color.setHex(0xfacc15);
                     if (cp.stageNum > state.currentLevel) {
                         state.currentLevel = cp.stageNum;
                         if (cp.stageNum > state.maxUnlockedLevel) state.maxUnlockedLevel = cp.stageNum;
@@ -1900,8 +2122,18 @@
                         updateHud();
                     }
                     sfxCheckpoint();
-                    showToast(`¡Checkpoint Etapa ${cp.stageNum}!`, 1400);
+                    showToast(`¡Checkpoint! Etapa ${cp.stageNum} desbloqueada`, 1600);
                 }
+            }
+
+            if (goalPos && !state.wonGame && player.pos.distanceTo(goalPos) < 3.4) {
+                state.wonGame = true;
+                state.currentLevel = TOTAL_LEVELS;
+                state.maxUnlockedLevel = TOTAL_LEVELS;
+                saveState();
+                updateHud();
+                sfxWin();
+                openVictoryModal();
             }
 
             for (const c of coins) {
