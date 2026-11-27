@@ -343,7 +343,7 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 3.6;
+        const DRAGON_DIRECT_SCALE = 0.02;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -1198,13 +1198,14 @@
                     ambientDragons.length = 0;
 
                     let meshCount = 0;
+                    let rawSpanText = '?';
                     const configs = [
-                        { radius: 68, baseY: 40, speed: 0.34, phase: 0.2, scale: 0.90, bobAmp: 2.2 },
-                        { radius: 80, baseY: 47, speed: -0.26, phase: 2.3, scale: 1.0, bobAmp: 2.5 },
-                        { radius: 92, baseY: 54, speed: 0.22, phase: 4.4, scale: 0.95, bobAmp: 2.4 }
+                        { radius: 68, baseY: 40, speed: 0.34, phase: 0.2, scaleMult: 1.0, bobAmp: 2.2 },
+                        { radius: 80, baseY: 47, speed: -0.26, phase: 2.3, scaleMult: 1.15, bobAmp: 2.5 },
+                        { radius: 92, baseY: 54, speed: 0.22, phase: 4.4, scaleMult: 1.05, bobAmp: 2.4 }
                     ];
 
-                    configs.forEach((cfg) => {
+                    configs.forEach((cfg, idx) => {
                         const wrapper = new THREE.Group();
                         wrapper.userData.isAmbientDragon = true;
                         const bodyPivot = new THREE.Group();
@@ -1239,15 +1240,16 @@
                         });
 
                         clone.updateMatrixWorld(true);
-                        const box = new THREE.Box3().setFromObject(clone);
-                        const size = new THREE.Vector3();
-                        const center = new THREE.Vector3();
-                        box.getSize(size);
-                        box.getCenter(center);
-                        const span = Math.max(size.x, size.y, size.z, 0.001);
-                        const normScale = (DRAGON_TARGET_SPAN * cfg.scale) / span;
-                        clone.scale.setScalar(normScale);
-                        clone.position.set(-center.x * normScale, -center.y * normScale, -center.z * normScale);
+                        if (idx === 0) {
+                            const rawBox = new THREE.Box3().setFromObject(clone);
+                            const rawSize = new THREE.Vector3();
+                            rawBox.getSize(rawSize);
+                            rawSpanText = `${Math.max(rawSize.x, rawSize.y, rawSize.z).toFixed(1)}`;
+                        }
+
+                        const finalScale = DRAGON_DIRECT_SCALE * cfg.scaleMult;
+                        clone.scale.setScalar(finalScale);
+                        clone.position.set(0, 0, 0);
                         clone.rotation.y = Math.PI / 2;
 
                         bodyPivot.add(clone);
@@ -1283,7 +1285,7 @@
 
                     const animCount = Array.isArray(gltf.animations) ? gltf.animations.length : 0;
                     const totalPieces = meshCount / Math.max(1, ambientDragons.length);
-                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, piezas:${Math.round(totalPieces)}, anim:${animCount})`);
+                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, raw:${rawSpanText}, esc:${DRAGON_DIRECT_SCALE}, anim:${animCount}, p:${Math.round(totalPieces)})`);
                 },
                 undefined,
                 (err) => {
