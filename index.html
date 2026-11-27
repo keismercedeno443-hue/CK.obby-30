@@ -343,7 +343,7 @@
         const USE_STOP_WALKING_GLB = true;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_DIRECT_SCALE = 0.02;
+        const DRAGON_DIRECT_SCALE = 0.0025;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -1200,9 +1200,9 @@
                     let meshCount = 0;
                     let rawSpanText = '?';
                     const configs = [
-                        { radius: 68, baseY: 40, speed: 0.34, phase: 0.2, scaleMult: 1.0, bobAmp: 2.2 },
-                        { radius: 80, baseY: 47, speed: -0.26, phase: 2.3, scaleMult: 1.15, bobAmp: 2.5 },
-                        { radius: 92, baseY: 54, speed: 0.22, phase: 4.4, scaleMult: 1.05, bobAmp: 2.4 }
+                        { radius: 75, baseY: 46, speed: 0.34, phase: 0.2, scaleMult: 0.9, bobAmp: 2.2 },
+                        { radius: 87, baseY: 53, speed: -0.26, phase: 2.3, scaleMult: 1.05, bobAmp: 2.5 },
+                        { radius: 98, baseY: 60, speed: 0.22, phase: 4.4, scaleMult: 1.0, bobAmp: 2.4 }
                     ];
 
                     configs.forEach((cfg, idx) => {
