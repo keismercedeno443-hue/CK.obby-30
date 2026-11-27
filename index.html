@@ -193,7 +193,7 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 14.0;
+        const DRAGON_TARGET_SPAN = 15.5;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -600,12 +600,12 @@
 
             for (let i = 0; i < totalClouds; i++) {
                 const angle = (i / totalClouds) * Math.PI * 2 + (i % 3) * 0.14;
-                const radius = 148 + (i % 4) * 32;
+                const radius = 56 + (i % 4) * 24;
                 const cx = Math.cos(angle) * radius;
                 const cz = Math.sin(angle) * radius;
-                const cy = Math.max(14, lavaFloorY + 18 + (i % 5) * 9);
+                const cy = 22 + (i % 5) * 5.5;
 
-                const scale = 1.2 + (i % 4) * 0.38;
+                const scale = 1.15 + (i % 4) * 0.32;
                 const cloud = createGreyishCloudCluster(cx, cy, cz, scale, cloudTints[i % cloudTints.length]);
                 cloud.userData.isSkyCloud = true;
                 cloud.rotation.y = -angle + Math.PI / 2;
@@ -665,9 +665,9 @@
                     ambientDragons.length = 0;
 
                     const configs = [
-                        { radius: 30, baseY: 12, speed: 0.18, phase: 0.0, scale: 1.0, bobAmp: 1.6 },
-                        { radius: 42, baseY: 16, speed: -0.14, phase: 2.1, scale: 1.15, bobAmp: 2.0 },
-                        { radius: 54, baseY: 14, speed: 0.12, phase: 4.2, scale: 1.1, bobAmp: 1.8 }
+                        { radius: 24, baseY: 24, speed: 0.20, phase: 0.2, scale: 1.0, bobAmp: 1.5 },
+                        { radius: 32, baseY: 29, speed: -0.15, phase: 2.3, scale: 1.15, bobAmp: 1.8 },
+                        { radius: 40, baseY: 34, speed: 0.13, phase: 4.4, scale: 1.1, bobAmp: 1.7 }
                     ];
 
                     configs.forEach((cfg) => {
@@ -693,7 +693,7 @@
                                         }
                                         if (m.emissive && m.emissive.getHex() === 0x000000) {
                                             m.emissive.setHex(0xea580c);
-                                            m.emissiveIntensity = 0.45;
+                                            m.emissiveIntensity = 0.5;
                                         }
                                         m.needsUpdate = true;
                                     });
@@ -1728,7 +1728,7 @@
                 d.angle += d.speed * dt;
                 const x = Math.cos(d.angle) * d.radius;
                 const z = Math.sin(d.angle) * d.radius;
-                const y = Math.max(8, lavaFloorY + d.baseY) + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
+                const y = d.baseY + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
 
                 d.wrapper.position.set(x, y, z);
                 const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
