@@ -183,6 +183,8 @@
         const MAP_GLB_URL = './colorful_100-stage_obby.glb';
         const LAVA_FLOOR_GLB_URL = './lava.glb';
         const LAVA_DRAGON_GLB_URL = './lava_dragon.glb';
+        const BGM_AUDIO_URL = './musica.mp3';
+        const BGM_VOLUME = 0.45;
         const ANIM_IDLE_GLB_URL = './stop_walking.glb';
         const ANIM_RUN_GLB_URL = './Running-Amy.glb';
         const ANIM_JUMP_GLB_URL = './Jump.glb';
@@ -191,7 +193,7 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 9.5;
+        const DRAGON_TARGET_SPAN = 14.0;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -268,8 +270,17 @@
         }
 
         let audioCtx = null;
-        let bgmTimer = null;
-        let bgmStep = 0;
+        let bgmAudioEl = null;
+
+        function ensureBgmAudio() {
+            if (!bgmAudioEl) {
+                bgmAudioEl = new Audio(BGM_AUDIO_URL);
+                bgmAudioEl.loop = true;
+                bgmAudioEl.preload = 'auto';
+                bgmAudioEl.volume = BGM_VOLUME;
+            }
+            return bgmAudioEl;
+        }
 
         function ensureAudioContext() {
             if (!state.soundEnabled) return null;
@@ -315,25 +326,15 @@
         function sfxFail() { playTone(220, 0.25, 'sawtooth', 0.08, 95); }
 
         function startSuspenseMusic() {
-            stopSuspenseMusic();
-            if (!state.soundEnabled) return;
-            ensureAudioContext();
-            const bassNotes = [110, 110, 130.81, 123.47, 110, 110, 146.83, 138.59];
-            const tensionLead = [440, 0, 466.16, 440, 392, 0, 349.23, 369.99];
-            bgmTimer = setInterval(() => {
-                if (!state.soundEnabled || state.mode !== 'playing') return;
-                const idx = bgmStep % bassNotes.length;
-                playTone(bassNotes[idx], 0.13, 'triangle', 0.045);
-                if (tensionLead[idx] > 0) playTone(tensionLead[idx], 0.11, 'sawtooth', 0.025);
-                if (bgmStep % 2 === 0) playTone(1250, 0.025, 'sine', 0.018);
-                bgmStep += 1;
-            }, 230);
+            if (!state.soundEnabled || state.mode !== 'playing') return;
+            const bgm = ensureBgmAudio();
+            bgm.volume = BGM_VOLUME;
+            bgm.play().catch(() => {});
         }
 
         function stopSuspenseMusic() {
-            if (bgmTimer) {
-                clearInterval(bgmTimer);
-                bgmTimer = null;
+            if (bgmAudioEl) {
+                bgmAudioEl.pause();
             }
         }
 
@@ -641,7 +642,7 @@
                     child.getWorldPosition(worldPos);
                     const relX = worldPos.x - center.x;
                     const relY = worldPos.y - center.y;
-                    if (Math.abs(relX) > size.x * 0.18 && relY > -size.y * 0.15) {
+                    if (Math.abs(relX) > size.x * 0.16 && relY > -size.y * 0.2) {
                         if (relX < 0) leftWingParts.push(child);
                         else rightWingParts.push(child);
                     }
@@ -664,12 +665,12 @@
                     ambientDragons.length = 0;
 
                     const configs = [
-                        { radius: 64, baseY: 28, speed: 0.15, phase: 0.0, scale: 1.0, bobAmp: 2.0 },
-                        { radius: 88, baseY: 38, speed: -0.11, phase: 2.1, scale: 1.2, bobAmp: 2.5 },
-                        { radius: 112, baseY: 22, speed: 0.09, phase: 4.2, scale: 1.1, bobAmp: 2.2 }
+                        { radius: 30, baseY: 12, speed: 0.18, phase: 0.0, scale: 1.0, bobAmp: 1.6 },
+                        { radius: 42, baseY: 16, speed: -0.14, phase: 2.1, scale: 1.15, bobAmp: 2.0 },
+                        { radius: 54, baseY: 14, speed: 0.12, phase: 4.2, scale: 1.1, bobAmp: 1.8 }
                     ];
 
-                    configs.forEach((cfg, idx) => {
+                    configs.forEach((cfg) => {
                         const wrapper = new THREE.Group();
                         wrapper.userData.isAmbientDragon = true;
                         const bodyPivot = new THREE.Group();
@@ -691,8 +692,8 @@
                                             m.needsUpdate = true;
                                         }
                                         if (m.emissive && m.emissive.getHex() === 0x000000) {
-                                            m.emissive.setHex(0x9a3412);
-                                            m.emissiveIntensity = 0.28;
+                                            m.emissive.setHex(0xea580c);
+                                            m.emissiveIntensity = 0.45;
                                         }
                                         m.needsUpdate = true;
                                     });
@@ -1475,6 +1476,7 @@
 
             canvas.addEventListener('touchstart', (e) => {
                 if (state.mode !== 'playing') return;
+                startSuspenseMusic();
 
                 const halfW = window.innerWidth * 0.5;
                 for (let i = 0; i < e.changedTouches.length; i++) {
@@ -1726,7 +1728,7 @@
                 d.angle += d.speed * dt;
                 const x = Math.cos(d.angle) * d.radius;
                 const z = Math.sin(d.angle) * d.radius;
-                const y = Math.max(16, lavaFloorY + d.baseY) + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
+                const y = Math.max(8, lavaFloorY + d.baseY) + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
 
                 d.wrapper.position.set(x, y, z);
                 const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
@@ -1905,6 +1907,7 @@
 
         window.addEventListener('load', () => {
             loadState();
+            ensureBgmAudio();
             initThree();
             bindControls();
             updateHud();
