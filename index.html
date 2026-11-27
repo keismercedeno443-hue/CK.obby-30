@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1e293b">
-    <title>Obby 3D Estilo Roblox — Selector de Personaje</title>
+    <title>Obby 3D Estilo Roblox — Vista Previa 3D de Personaje</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -31,6 +31,12 @@
             display: block;
             width: 100%;
             height: 100%;
+        }
+        #char-preview-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
         }
         .roblox-btn {
             transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.15s ease;
@@ -86,77 +92,88 @@
 
     <!-- Pantalla de Inicio / Lobby -->
     <div id="lobby-screen" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-gradient-to-b from-slate-800/75 via-slate-900/80 to-slate-950/90 backdrop-blur-sm">
-        <div class="w-full max-w-md bg-slate-900/92 border-2 border-white/20 rounded-3xl p-5 sm:p-6 text-white shadow-2xl text-center">
+        <div class="w-full max-w-md bg-slate-900/92 border-2 border-white/20 rounded-3xl p-6 text-white shadow-2xl text-center">
             <div id="lobby-char-badge" class="inline-block bg-pink-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full mb-2">
                 PERSONAJE: AMY • OBBY 3D
             </div>
-            <h1 class="roblox-title text-2xl sm:text-4xl font-bold tracking-tight mb-1.5">
+            <h1 class="roblox-title text-3xl sm:text-4xl font-bold tracking-tight mb-2">
                 Colorful 100-Stage Obby
             </h1>
-            <p class="text-slate-300 text-xs sm:text-sm mb-4">
-                Elige tu personaje, avanza checkpoint por checkpoint hasta el nivel 100 y evita la lava.
+            <p class="text-slate-300 text-xs sm:text-sm mb-5">
+                Avanza checkpoint por checkpoint hasta la meta del nivel 100 evitando la lava.
             </p>
 
-            <!-- Apartado Selector de Personaje -->
-            <div class="bg-slate-800/80 border border-white/10 rounded-2xl p-3 mb-4 text-left">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] uppercase tracking-wider text-amber-300 font-extrabold">Elige tu Personaje</span>
-                    <span id="selected-char-label" class="text-xs font-bold text-slate-200">Amy</span>
-                </div>
-                <div id="character-picker" class="grid grid-cols-2 gap-2">
-                    <button type="button" data-char-id="amy" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
-                        <span class="w-7 h-7 rounded-lg bg-pink-500/30 border border-pink-400/50 flex items-center justify-center text-base">🎀</span>
-                        <span class="leading-tight">
-                            <span class="block text-xs font-extrabold text-white">Amy</span>
-                            <span class="block text-[10px] text-slate-300">Clásica</span>
-                        </span>
-                    </button>
-
-                    <button type="button" data-char-id="mi_bebe" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
-                        <span class="w-7 h-7 rounded-lg bg-sky-400/25 border border-sky-300/50 flex items-center justify-center text-base">🍼</span>
-                        <span class="leading-tight">
-                            <span class="block text-xs font-extrabold text-white">Mi Bebé</span>
-                            <span class="block text-[10px] text-slate-300">Tierno</span>
-                        </span>
-                    </button>
-
-                    <button type="button" data-char-id="leo_lava" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
-                        <span class="w-7 h-7 rounded-lg bg-orange-500/30 border border-orange-400/50 flex items-center justify-center text-base">🔥</span>
-                        <span class="leading-tight">
-                            <span class="block text-xs font-extrabold text-white">Leo Lava</span>
-                            <span class="block text-[10px] text-slate-300">Volcánico</span>
-                        </span>
-                    </button>
-
-                    <button type="button" data-char-id="nova_cielo" class="char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition">
-                        <span class="w-7 h-7 rounded-lg bg-cyan-400/25 border border-cyan-300/50 flex items-center justify-center text-base">⚡</span>
-                        <span class="leading-tight">
-                            <span class="block text-xs font-extrabold text-white">Nova Cielo</span>
-                            <span class="block text-[10px] text-slate-300">Estelar</span>
-                        </span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 mb-4">
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-2.5">
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Etapa Máxima</div>
                     <div id="lobby-max-level" class="text-lg font-black text-sky-300 mt-0.5">1 / 100</div>
                 </div>
-                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-2.5">
+                <div class="bg-slate-800/90 border border-white/10 rounded-2xl p-3">
                     <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Monedas</div>
                     <div id="lobby-coins" class="text-lg font-black text-amber-300 mt-0.5">0</div>
                 </div>
             </div>
 
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2.5">
                 <button id="btn-play" class="roblox-btn w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-base tracking-wide">
                     ▶ JUGAR AHORA
                 </button>
-                <button id="btn-open-levels" class="roblox-btn w-full py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
+                <button id="btn-open-character" class="roblox-btn w-full py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2">
+                    <span>🎭</span>
+                    <span>Elegir Personaje</span>
+                    <span id="lobby-selected-char-pill" class="px-2 py-0.5 rounded-full bg-slate-950/15 text-xs font-black">Amy</span>
+                </button>
+                <button id="btn-open-levels" class="roblox-btn w-full py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">
                     🗺️ Elegir Etapa (1 - 100)
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal Vista Previa 3D y Selección de Personaje -->
+    <div id="character-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+        <div class="w-full max-w-md bg-slate-900 border-2 border-white/20 rounded-3xl p-4 sm:p-5 text-white shadow-2xl flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="roblox-title text-xl sm:text-2xl font-bold">Elegir Personaje</h2>
+                    <p class="text-[11px] text-slate-400">Arrastra el muñeco para girarlo en 3D</p>
+                </div>
+                <button id="btn-close-character" class="roblox-btn bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                    ✕ Cerrar
+                </button>
+            </div>
+
+            <!-- Escenario 3D de Vista Previa -->
+            <div class="relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden border border-white/15 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 mb-3">
+                <canvas id="char-preview-canvas"></canvas>
+                <div class="absolute bottom-2.5 left-1/2 -translate-x-1/2 pointer-events-none bg-slate-950/80 border border-white/15 px-3.5 py-1 rounded-full text-xs font-extrabold text-amber-300">
+                    <span id="preview-char-name">Amy</span> • <span id="preview-char-desc" class="text-slate-300 font-semibold">Clásica</span>
+                </div>
+            </div>
+
+            <!-- Botones de Personajes -->
+            <div class="grid grid-cols-2 gap-2 mb-4">
+                <button type="button" data-preview-char="amy" class="preview-char-btn roblox-btn py-2.5 px-3 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5">
+                    <span>🎀</span>
+                    <span>Amy</span>
+                </button>
+                <button type="button" data-preview-char="mi_bebe" class="preview-char-btn roblox-btn py-2.5 px-3 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5">
+                    <span>🍼</span>
+                    <span>Mi Bebé</span>
+                </button>
+                <button type="button" data-preview-char="leo_lava" class="preview-char-btn roblox-btn py-2.5 px-3 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5">
+                    <span>🔥</span>
+                    <span>Leo Lava</span>
+                </button>
+                <button type="button" data-preview-char="nova_cielo" class="preview-char-btn roblox-btn py-2.5 px-3 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5">
+                    <span>⚡</span>
+                    <span>Nova Cielo</span>
+                </button>
+            </div>
+
+            <button id="btn-confirm-character" class="roblox-btn w-full py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-sm tracking-wide">
+                ✓ USAR ESTE PERSONAJE
+            </button>
         </div>
     </div>
 
@@ -249,7 +266,7 @@
 
     <script>
         const TOTAL_LEVELS = 100;
-        const STORAGE_KEY = 'obby_roblox_100_amy_v25';
+        const STORAGE_KEY = 'obby_roblox_100_amy_v26';
         const CUSTOM_SPAWN_KEY = 'obby_roblox_100_amy_spawn_v1';
 
         const PLAYER_GLB_URL = './Amy.glb';
@@ -266,6 +283,7 @@
             amy: {
                 id: 'amy',
                 name: 'Amy',
+                subtitle: 'Clásica',
                 badge: 'PERSONAJE: AMY • OBBY 3D',
                 badgeClass: 'bg-pink-400 text-slate-950',
                 scale: 1.40,
@@ -274,6 +292,7 @@
             mi_bebe: {
                 id: 'mi_bebe',
                 name: 'Mi Bebé',
+                subtitle: 'Tierno',
                 badge: 'PERSONAJE: MI BEBÉ • OBBY 3D',
                 badgeClass: 'bg-sky-300 text-slate-950',
                 scale: 1.18,
@@ -282,6 +301,7 @@
             leo_lava: {
                 id: 'leo_lava',
                 name: 'Leo Lava',
+                subtitle: 'Volcánico',
                 badge: 'PERSONAJE: LEO LAVA • OBBY 3D',
                 badgeClass: 'bg-orange-400 text-slate-950',
                 scale: 1.38,
@@ -290,6 +310,7 @@
             nova_cielo: {
                 id: 'nova_cielo',
                 name: 'Nova Cielo',
+                subtitle: 'Estelar',
                 badge: 'PERSONAJE: NOVA CIELO • OBBY 3D',
                 badgeClass: 'bg-cyan-300 text-slate-950',
                 scale: 1.38,
@@ -317,6 +338,7 @@
         const state = {
             mode: 'lobby',
             selectedCharacter: 'amy',
+            previewCharacter: 'amy',
             currentLevel: 1,
             maxUnlockedLevel: 1,
             coins: 0,
@@ -326,6 +348,10 @@
 
         function getActiveCharacterConfig() {
             return CHARACTER_CATALOG[state.selectedCharacter] || CHARACTER_CATALOG.amy;
+        }
+
+        function getPreviewCharacterConfig() {
+            return CHARACTER_CATALOG[state.previewCharacter] || getActiveCharacterConfig();
         }
 
         function requestImmersiveFullscreen() {
@@ -346,6 +372,7 @@
                 const parsed = JSON.parse(raw);
                 if (typeof parsed.selectedCharacter === 'string' && CHARACTER_CATALOG[parsed.selectedCharacter]) {
                     state.selectedCharacter = parsed.selectedCharacter;
+                    state.previewCharacter = parsed.selectedCharacter;
                 }
                 if (typeof parsed.currentLevel === 'number') state.currentLevel = Math.max(1, Math.min(TOTAL_LEVELS, parsed.currentLevel));
                 if (typeof parsed.maxUnlockedLevel === 'number') state.maxUnlockedLevel = Math.max(1, Math.min(TOTAL_LEVELS, parsed.maxUnlockedLevel));
@@ -482,27 +509,17 @@
             }, duration);
         }
 
-        function syncCharacterPickerUI() {
+        function syncLobbyCharacterUI() {
             const cfg = getActiveCharacterConfig();
             const badge = document.getElementById('lobby-char-badge');
-            const label = document.getElementById('selected-char-label');
+            const pill = document.getElementById('lobby-selected-char-pill');
             if (badge) {
                 badge.className = `inline-block ${cfg.badgeClass} font-black text-xs px-3 py-1 rounded-full mb-2`;
                 badge.textContent = cfg.badge;
             }
-            if (label) {
-                label.textContent = cfg.name;
+            if (pill) {
+                pill.textContent = cfg.name;
             }
-            const buttons = document.querySelectorAll('.char-option');
-            buttons.forEach((btn) => {
-                const charId = btn.getAttribute('data-char-id');
-                const isSelected = charId === state.selectedCharacter;
-                btn.className = `char-option roblox-btn flex items-center gap-2 p-2 rounded-xl border text-left transition ${
-                    isSelected
-                        ? 'bg-amber-400/20 border-amber-300 ring-2 ring-amber-300/60'
-                        : 'bg-slate-900/75 border-white/10 hover:border-white/30'
-                }`;
-            });
         }
 
         function updateHud() {
@@ -514,7 +531,7 @@
             if (vc) vc.textContent = String(state.coins);
             const soundBtn = document.getElementById('btn-hud-sound');
             if (soundBtn) soundBtn.textContent = state.soundEnabled ? '🔊' : '🔇';
-            syncCharacterPickerUI();
+            syncLobbyCharacterUI();
         }
 
         function openVictoryModal() {
@@ -621,6 +638,19 @@
         const skyClouds = [];
         const ambientDragons = [];
         const studTextureCache = new Map();
+        let cachedAmyTemplate = null;
+
+        const previewState = {
+            open: false,
+            scene: null,
+            camera: null,
+            renderer: null,
+            modelHolder: null,
+            currentMesh: null,
+            rotY: 0.35,
+            dragging: false,
+            lastX: 0
+        };
 
         const player = {
             root: null,
@@ -1658,6 +1688,7 @@
 
                     if (meshCount === 0) return;
 
+                    cachedAmyTemplate = model;
                     const cfg = getActiveCharacterConfig();
                     model.position.set(0, 0, 0);
                     model.rotation.set(0, Math.PI, 0);
@@ -1680,6 +1711,9 @@
                     loadExternalAnimationClip(ANIM_JUMP_GLB_URL, 'jump', THREE.LoopRepeat);
 
                     applySelectedCharacterAppearance();
+                    if (previewState.open && state.previewCharacter === 'amy') {
+                        rebuildPreviewCharacterModel('amy');
+                    }
                 },
                 undefined,
                 (err) => {
@@ -1792,6 +1826,43 @@
                 return { group: g, leftLeg, rightLeg, leftArm, rightArm };
             }
 
+            if (charId === 'amy') {
+                const shirtMat = getStuddedMaterial(0xec4899, 0.45);
+                const skirtMat = getStuddedMaterial(0xf472b6, 0.45);
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.42 });
+                const hairMat = getStuddedMaterial(0xfb7185, 0.45);
+
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(1.06, 1.15, 0.6), shirtMat);
+                torso.position.y = 1.65;
+                g.add(torso);
+
+                const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.85, 0.55, 8), skirtMat);
+                skirt.position.y = 1.05;
+                g.add(skirt);
+
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.86), skinMat);
+                head.position.y = 2.68;
+                g.add(head);
+
+                const hair = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.45, 0.96), hairMat);
+                hair.position.set(0, 3.04, 0.04);
+                g.add(hair);
+
+                const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.95, 0.5), skinMat);
+                leftLeg.position.set(-0.26, 0.48, 0);
+                const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.95, 0.5), skinMat);
+                rightLeg.position.set(0.26, 0.48, 0);
+                g.add(leftLeg, rightLeg);
+
+                const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.98, 0.42), skinMat);
+                leftArm.position.set(-0.74, 1.68, 0);
+                const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.98, 0.42), skinMat);
+                rightArm.position.set(0.74, 1.68, 0);
+                g.add(leftArm, rightArm);
+
+                return { group: g, leftLeg, rightLeg, leftArm, rightArm };
+            }
+
             // nova_cielo
             const suitMat = getStuddedMaterial(0x0284c7, 0.35, 0x0ea5e9, 0.25);
             const neonMat = getStuddedMaterial(0x67e8f9, 0.2, 0x22d3ee, 0.75);
@@ -1870,6 +1941,139 @@
             player.visualPivot.add(player.fallbackGroup);
         }
 
+        function initCharacterPreviewScene() {
+            const canvas = document.getElementById('char-preview-canvas');
+            if (!canvas || previewState.renderer) return;
+
+            const pScene = new THREE.Scene();
+            const pCamera = new THREE.PerspectiveCamera(42, canvas.clientWidth / Math.max(1, canvas.clientHeight), 0.1, 50);
+            pCamera.position.set(0, 2.2, 6.2);
+            pCamera.lookAt(0, 1.65, 0);
+
+            const pRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+            pRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            pRenderer.setSize(canvas.clientWidth || 320, canvas.clientHeight || 220, false);
+            pRenderer.outputEncoding = THREE.sRGBEncoding;
+
+            pScene.add(new THREE.HemisphereLight(0xfef08a, 0x1e293b, 1.2));
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
+            keyLight.position.set(3, 6, 5);
+            pScene.add(keyLight);
+
+            const pedMat = new THREE.MeshStandardMaterial({
+                color: 0x334155,
+                roughness: 0.4,
+                metalness: 0.25
+            });
+            const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.85, 0.24, 28), pedMat);
+            pedestal.position.y = -0.12;
+            pScene.add(pedestal);
+
+            const holder = new THREE.Group();
+            pScene.add(holder);
+
+            previewState.scene = pScene;
+            previewState.camera = pCamera;
+            previewState.renderer = pRenderer;
+            previewState.modelHolder = holder;
+
+            canvas.addEventListener('pointerdown', (e) => {
+                previewState.dragging = true;
+                previewState.lastX = e.clientX;
+            });
+            window.addEventListener('pointermove', (e) => {
+                if (!previewState.dragging || !previewState.open) return;
+                const dx = e.clientX - previewState.lastX;
+                previewState.rotY += dx * 0.015;
+                previewState.lastX = e.clientX;
+            });
+            window.addEventListener('pointerup', () => {
+                previewState.dragging = false;
+            });
+        }
+
+        function resizePreviewRenderer() {
+            const canvas = document.getElementById('char-preview-canvas');
+            if (!canvas || !previewState.renderer || !previewState.camera) return;
+            const w = Math.max(1, canvas.clientWidth);
+            const h = Math.max(1, canvas.clientHeight);
+            previewState.camera.aspect = w / h;
+            previewState.camera.updateProjectionMatrix();
+            previewState.renderer.setSize(w, h, false);
+        }
+
+        function rebuildPreviewCharacterModel(charId) {
+            initCharacterPreviewScene();
+            if (!previewState.modelHolder) return;
+
+            while (previewState.modelHolder.children.length > 0) {
+                previewState.modelHolder.remove(previewState.modelHolder.children[0]);
+            }
+
+            const cfg = CHARACTER_CATALOG[charId] || CHARACTER_CATALOG.amy;
+            if (charId === 'amy' && cachedAmyTemplate) {
+                const clone = cachedAmyTemplate.clone(true);
+                clone.visible = true;
+                clone.position.set(0, 0, 0);
+                clone.rotation.set(0, Math.PI, 0);
+                clone.scale.setScalar(1.12);
+                previewState.modelHolder.add(clone);
+                previewState.currentMesh = clone;
+            } else {
+                const built = createStylizedRobloxCharacterGroup(charId);
+                built.group.scale.setScalar(0.95);
+                previewState.modelHolder.add(built.group);
+                previewState.currentMesh = built.group;
+            }
+
+            const nameEl = document.getElementById('preview-char-name');
+            const descEl = document.getElementById('preview-char-desc');
+            if (nameEl) nameEl.textContent = cfg.name;
+            if (descEl) descEl.textContent = cfg.subtitle;
+
+            document.querySelectorAll('.preview-char-btn').forEach((btn) => {
+                const id = btn.getAttribute('data-preview-char');
+                const active = id === charId;
+                btn.className = `preview-char-btn roblox-btn py-2.5 px-3 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5 ${
+                    active
+                        ? 'bg-amber-400 text-slate-950 border-amber-200'
+                        : 'bg-slate-800 hover:bg-slate-700 text-white border-white/15'
+                }`;
+            });
+        }
+
+        function openCharacterModal() {
+            state.previewCharacter = state.selectedCharacter;
+            previewState.open = true;
+            previewState.rotY = 0.25;
+            const modal = document.getElementById('character-modal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            resizePreviewRenderer();
+            rebuildPreviewCharacterModel(state.previewCharacter);
+        }
+
+        function closeCharacterModal() {
+            previewState.open = false;
+            previewState.dragging = false;
+            const modal = document.getElementById('character-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function renderCharacterPreviewFrame(dt) {
+            if (!previewState.open || !previewState.renderer || !previewState.scene || !previewState.camera) return;
+            if (!previewState.dragging && previewState.modelHolder) {
+                previewState.rotY += dt * 0.75;
+            }
+            if (previewState.modelHolder) {
+                previewState.modelHolder.rotation.y = previewState.rotY;
+            }
+            previewState.renderer.render(previewState.scene, previewState.camera);
+        }
+
         function buildRobloxPlayer() {
             const root = new THREE.Group();
             const visualPivot = new THREE.Group();
@@ -1931,6 +2135,7 @@
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
+                if (previewState.open) resizePreviewRenderer();
             });
         }
 
@@ -2014,16 +2219,26 @@
             });
             window.addEventListener('keyup', (e) => { input.keys[e.code] = false; });
 
-            document.querySelectorAll('.char-option').forEach((btn) => {
+            document.getElementById('btn-open-character')?.addEventListener('click', openCharacterModal);
+            document.getElementById('btn-close-character')?.addEventListener('click', closeCharacterModal);
+
+            document.querySelectorAll('.preview-char-btn').forEach((btn) => {
                 btn.addEventListener('click', () => {
-                    const charId = btn.getAttribute('data-char-id');
+                    const charId = btn.getAttribute('data-preview-char');
                     if (!charId || !CHARACTER_CATALOG[charId]) return;
-                    state.selectedCharacter = charId;
-                    saveState();
-                    applySelectedCharacterAppearance();
-                    updateHud();
-                    showToast(`Personaje: ${CHARACTER_CATALOG[charId].name}`, 1300);
+                    state.previewCharacter = charId;
+                    rebuildPreviewCharacterModel(charId);
                 });
+            });
+
+            document.getElementById('btn-confirm-character')?.addEventListener('click', () => {
+                const chosen = state.previewCharacter || 'amy';
+                state.selectedCharacter = chosen;
+                saveState();
+                applySelectedCharacterAppearance();
+                updateHud();
+                closeCharacterModal();
+                showToast(`Personaje seleccionado: ${CHARACTER_CATALOG[chosen].name}`, 1400);
             });
 
             const canvas = document.getElementById('game-canvas');
@@ -2525,6 +2740,7 @@
             updatePlayer(dt, elapsed);
             updateCamera();
             renderer.render(scene, camera);
+            renderCharacterPreviewFrame(dt);
         }
 
         window.addEventListener('load', () => {
