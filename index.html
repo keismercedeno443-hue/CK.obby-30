@@ -74,6 +74,11 @@
         <div id="dynamic-joy-knob"></div>
     </div>
 
+    <!-- Detector de estado de dragones -->
+    <div id="dragon-diag" class="fixed bottom-3 left-3 z-50 pointer-events-none bg-slate-950/85 text-amber-300 border border-amber-400/40 px-3 py-1.5 rounded-xl text-[11px] font-bold shadow-lg max-w-[85vw]">
+        Dragón: buscando lava_dragon.glb...
+    </div>
+
     <!-- Banner de notificación -->
     <div id="toast-banner" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200">
         <div id="toast-text" class="bg-slate-950/90 text-amber-300 border border-amber-400/40 px-4 py-2 rounded-full text-xs sm:text-sm font-extrabold shadow-xl text-center"></div>
@@ -193,7 +198,7 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 15.5;
+        const DRAGON_TARGET_SPAN = 18.0;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -201,6 +206,11 @@
 
         const LEVEL_1_FIXED_SPAWN = { x: 52.0, y: 4.6, z: -21.5 };
         const LEVEL_1_FACING_YAW = -1.89;
+
+        function setDragonDiag(text) {
+            const el = document.getElementById('dragon-diag');
+            if (el) el.textContent = text;
+        }
 
         const state = {
             mode: 'lobby',
@@ -600,12 +610,12 @@
 
             for (let i = 0; i < totalClouds; i++) {
                 const angle = (i / totalClouds) * Math.PI * 2 + (i % 3) * 0.14;
-                const radius = 56 + (i % 4) * 24;
+                const radius = 155 + (i % 4) * 26;
                 const cx = Math.cos(angle) * radius;
                 const cz = Math.sin(angle) * radius;
-                const cy = 22 + (i % 5) * 5.5;
+                const cy = 34 + (i % 5) * 6;
 
-                const scale = 1.15 + (i % 4) * 0.32;
+                const scale = 1.35 + (i % 4) * 0.35;
                 const cloud = createGreyishCloudCluster(cx, cy, cz, scale, cloudTints[i % cloudTints.length]);
                 cloud.userData.isSkyCloud = true;
                 cloud.rotation.y = -angle + Math.PI / 2;
@@ -653,21 +663,29 @@
         }
 
         function loadAmbientLavaDragons() {
-            if (typeof THREE.GLTFLoader !== 'function' || !environmentGroup) return;
+            if (typeof THREE.GLTFLoader !== 'function' || !environmentGroup) {
+                setDragonDiag('Dragón: GLTFLoader no disponible');
+                return;
+            }
+            setDragonDiag('Dragón: cargando lava_dragon.glb...');
             const loader = new THREE.GLTFLoader();
             loader.load(
                 LAVA_DRAGON_GLB_URL,
                 (gltf) => {
-                    if (!gltf || !gltf.scene) return;
+                    if (!gltf || !gltf.scene) {
+                        setDragonDiag('Dragón: archivo vacío o sin escena');
+                        return;
+                    }
                     for (const d of ambientDragons) {
                         if (d.wrapper) environmentGroup.remove(d.wrapper);
                     }
                     ambientDragons.length = 0;
 
+                    let meshCount = 0;
                     const configs = [
-                        { radius: 24, baseY: 24, speed: 0.20, phase: 0.2, scale: 1.0, bobAmp: 1.5 },
-                        { radius: 32, baseY: 29, speed: -0.15, phase: 2.3, scale: 1.15, bobAmp: 1.8 },
-                        { radius: 40, baseY: 34, speed: 0.13, phase: 4.4, scale: 1.1, bobAmp: 1.7 }
+                        { radius: 26, baseY: 22, speed: 0.20, phase: 0.2, scale: 1.0, bobAmp: 1.5 },
+                        { radius: 34, baseY: 27, speed: -0.15, phase: 2.3, scale: 1.15, bobAmp: 1.8 },
+                        { radius: 42, baseY: 32, speed: 0.13, phase: 4.4, scale: 1.1, bobAmp: 1.7 }
                     ];
 
                     configs.forEach((cfg) => {
@@ -678,6 +696,7 @@
 
                         clone.traverse((child) => {
                             if (child.isMesh || child.isSkinnedMesh) {
+                                meshCount += 1;
                                 child.visible = true;
                                 child.castShadow = false;
                                 child.receiveShadow = false;
@@ -707,7 +726,7 @@
                         const center = new THREE.Vector3();
                         box.getSize(size);
                         box.getCenter(center);
-                        const span = Math.max(size.x, size.y, size.z, 1);
+                        const span = Math.max(size.x, size.y, size.z, 0.001);
                         const normScale = (DRAGON_TARGET_SPAN * cfg.scale) / span;
                         clone.scale.setScalar(normScale);
                         clone.position.set(-center.x * normScale, -center.y * normScale, -center.z * normScale);
@@ -740,9 +759,14 @@
                             bobAmp: cfg.bobAmp
                         });
                     });
+
+                    const animCount = Array.isArray(gltf.animations) ? gltf.animations.length : 0;
+                    setDragonDiag(`Dragón: OK (${ambientDragons.length}x, piezas:${meshCount}, anim:${animCount})`);
                 },
                 undefined,
                 (err) => {
+                    const detail = err && err.message ? err.message : 'revisa si lava_dragon.glb existe en la raíz';
+                    setDragonDiag(`Dragón ERROR: ${detail}`);
                     console.warn('No se pudo cargar lava_dragon.glb:', err);
                 }
             );
