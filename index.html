@@ -103,7 +103,7 @@
                 </div>
             </div>
             <h1 class="roblox-title text-2xl sm:text-4xl font-bold tracking-tight mb-1.5">
-                Colorful 100-Stage Obby
+                Obby-Ck 100-Stage
             </h1>
             <p class="text-slate-300 text-xs sm:text-sm mb-4">
                 Entren todos a la misma sala para verse y jugar juntos hasta el nivel 100.
@@ -2284,9 +2284,48 @@
             if (charId === 'amy' && cachedAmyTemplate) {
                 const clone = cachedAmyTemplate.clone(true);
                 clone.visible = true;
+                clone.frustumCulled = false;
+
+                clone.traverse((child) => {
+                    child.visible = true;
+                    if (child.isMesh || child.isSkinnedMesh) {
+                        child.visible = true;
+                        child.frustumCulled = false;
+                        if (child.material) {
+                            const mats = Array.isArray(child.material) ? child.material : [child.material];
+                            mats.forEach((m) => {
+                                m.visible = true;
+                                m.transparent = false;
+                                m.opacity = 1;
+                                m.side = THREE.DoubleSide;
+                                m.needsUpdate = true;
+                            });
+                        }
+                    }
+                });
+
                 clone.position.set(0, 0, 0);
                 clone.rotation.set(0, Math.PI, 0);
-                clone.scale.setScalar(1.12);
+                clone.scale.setScalar(1);
+                clone.updateMatrixWorld(true);
+
+                const box = new THREE.Box3().setFromObject(clone);
+                const size = new THREE.Vector3();
+                const center = new THREE.Vector3();
+                box.getSize(size);
+                box.getCenter(center);
+
+                const maxDim = Math.max(size.y, size.x, size.z, 0.001);
+                const targetHeight = 3.1;
+                const fitScale = targetHeight / maxDim;
+
+                clone.scale.setScalar(fitScale);
+                clone.position.set(
+                    -center.x * fitScale,
+                    -box.min.y * fitScale,
+                    -center.z * fitScale
+                );
+
                 previewState.modelHolder.add(clone);
                 previewState.currentMesh = clone;
             } else {
