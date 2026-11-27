@@ -715,12 +715,9 @@
                                             m.map.encoding = THREE.sRGBEncoding;
                                             m.needsUpdate = true;
                                         }
-                                        if (m.color && m.color.getHex() < 0x888888) {
-                                            m.color.lerp(new THREE.Color(0xfacc15), 0.35);
-                                        }
                                         if (m.emissive) {
-                                            m.emissive.setHex(0xf59e0b);
-                                            m.emissiveIntensity = 0.42;
+                                            m.emissive.setHex(0xea580c);
+                                            m.emissiveIntensity = 0.25;
                                         }
                                         m.needsUpdate = true;
                                     });
