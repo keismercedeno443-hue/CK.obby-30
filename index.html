@@ -198,7 +198,7 @@
         const AMY_DIRECT_SCALE = 1.40;
         const MAP_TARGET_SPAN = 180;
         const LAVA_FLOOR_SPAN = 760;
-        const DRAGON_TARGET_SPAN = 18.0;
+        const DRAGON_TARGET_SPAN = 20.0;
         const MIN_CAM_DIST = 5.5;
         const MAX_CAM_DIST = 13.5;
         const MIN_CAM_PITCH = -0.45;
@@ -613,7 +613,7 @@
                 const radius = 155 + (i % 4) * 26;
                 const cx = Math.cos(angle) * radius;
                 const cz = Math.sin(angle) * radius;
-                const cy = 34 + (i % 5) * 6;
+                const cy = 52 + (i % 5) * 6;
 
                 const scale = 1.35 + (i % 4) * 0.35;
                 const cloud = createGreyishCloudCluster(cx, cy, cz, scale, cloudTints[i % cloudTints.length]);
@@ -635,6 +635,7 @@
         function createWingFlapParts(dragonModel) {
             const leftWingParts = [];
             const rightWingParts = [];
+            const allMeshes = [];
             const box = new THREE.Box3().setFromObject(dragonModel);
             const center = new THREE.Vector3();
             const size = new THREE.Vector3();
@@ -643,23 +644,27 @@
 
             dragonModel.traverse((child) => {
                 const n = (child.name || '').toLowerCase();
+                if (child.isMesh || child.isSkinnedMesh) {
+                    allMeshes.push(child);
+                }
                 if (n.includes('wing_l') || n.includes('leftwing') || n.includes('wing.l') || n.includes('ala_izq')) {
                     leftWingParts.push(child);
                 } else if (n.includes('wing_r') || n.includes('rightwing') || n.includes('wing.r') || n.includes('ala_der')) {
                     rightWingParts.push(child);
                 } else if (child.isMesh) {
-                    const worldPos = new THREE.Vector3();
-                    child.getWorldPosition(worldPos);
-                    const relX = worldPos.x - center.x;
-                    const relY = worldPos.y - center.y;
-                    if (Math.abs(relX) > size.x * 0.16 && relY > -size.y * 0.2) {
+                    const partBox = new THREE.Box3().setFromObject(child);
+                    const partCenter = new THREE.Vector3();
+                    partBox.getCenter(partCenter);
+                    const relX = partCenter.x - center.x;
+                    const relY = partCenter.y - center.y;
+                    if (Math.abs(relX) > size.x * 0.14 && relY > -size.y * 0.25) {
                         if (relX < 0) leftWingParts.push(child);
                         else rightWingParts.push(child);
                     }
                 }
             });
 
-            return { leftWingParts, rightWingParts };
+            return { leftWingParts, rightWingParts, allMeshes };
         }
 
         function loadAmbientLavaDragons() {
@@ -683,9 +688,9 @@
 
                     let meshCount = 0;
                     const configs = [
-                        { radius: 26, baseY: 22, speed: 0.20, phase: 0.2, scale: 1.0, bobAmp: 1.5 },
-                        { radius: 34, baseY: 27, speed: -0.15, phase: 2.3, scale: 1.15, bobAmp: 1.8 },
-                        { radius: 42, baseY: 32, speed: 0.13, phase: 4.4, scale: 1.1, bobAmp: 1.7 }
+                        { radius: 58, baseY: 48, speed: 0.22, phase: 0.2, scale: 1.0, bobAmp: 2.2 },
+                        { radius: 76, baseY: 56, speed: -0.17, phase: 2.3, scale: 1.15, bobAmp: 2.6 },
+                        { radius: 95, baseY: 64, speed: 0.15, phase: 4.4, scale: 1.1, bobAmp: 2.4 }
                     ];
 
                     configs.forEach((cfg) => {
@@ -710,9 +715,12 @@
                                             m.map.encoding = THREE.sRGBEncoding;
                                             m.needsUpdate = true;
                                         }
-                                        if (m.emissive && m.emissive.getHex() === 0x000000) {
-                                            m.emissive.setHex(0xea580c);
-                                            m.emissiveIntensity = 0.5;
+                                        if (m.color && m.color.getHex() < 0x888888) {
+                                            m.color.lerp(new THREE.Color(0xfacc15), 0.35);
+                                        }
+                                        if (m.emissive) {
+                                            m.emissive.setHex(0xf59e0b);
+                                            m.emissiveIntensity = 0.42;
                                         }
                                         m.needsUpdate = true;
                                     });
@@ -1370,7 +1378,7 @@
             const canvas = document.getElementById('game-canvas');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x263447);
-            scene.fog = new THREE.FogExp2(0x3b3545, 0.0020);
+            scene.fog = new THREE.FogExp2(0x3b3545, 0.0016);
 
             camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 900);
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -1752,7 +1760,8 @@
                 d.angle += d.speed * dt;
                 const x = Math.cos(d.angle) * d.radius;
                 const z = Math.sin(d.angle) * d.radius;
-                const y = d.baseY + Math.sin(elapsed * 1.4 + d.phase) * d.bobAmp;
+                const flap = Math.sin(elapsed * 6.4 + d.phase);
+                const y = d.baseY + Math.sin(elapsed * 1.6 + d.phase) * d.bobAmp - flap * 0.75;
 
                 d.wrapper.position.set(x, y, z);
                 const tangentYaw = -d.angle + (d.speed >= 0 ? Math.PI : 0);
@@ -1760,16 +1769,24 @@
 
                 if (d.mixer) {
                     d.mixer.update(dt);
-                } else {
-                    const flap = Math.sin(elapsed * 5.2 + d.phase);
-                    d.bodyPivot.rotation.z = flap * 0.06;
-                    d.bodyPivot.rotation.x = Math.cos(elapsed * 2.6 + d.phase) * 0.05;
+                }
+
+                d.bodyPivot.rotation.z = flap * 0.11;
+                d.bodyPivot.rotation.x = Math.cos(elapsed * 3.2 + d.phase) * 0.08;
+
+                if (d.wingParts.leftWingParts.length > 0 || d.wingParts.rightWingParts.length > 0) {
                     for (const lw of d.wingParts.leftWingParts) {
-                        lw.rotation.z = flap * 0.42;
+                        lw.rotation.z = flap * 0.55;
                     }
                     for (const rw of d.wingParts.rightWingParts) {
-                        rw.rotation.z = -flap * 0.42;
+                        rw.rotation.z = -flap * 0.55;
                     }
+                } else if (d.wingParts.allMeshes.length > 1) {
+                    d.wingParts.allMeshes.forEach((m, idx) => {
+                        if (idx > 0) {
+                            m.rotation.z = flap * (idx % 2 === 0 ? 0.45 : -0.45);
+                        }
+                    });
                 }
             }
 
